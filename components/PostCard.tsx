@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { useIsFocused } from "@react-navigation/native";
 import { Audio, type AVPlaybackStatus } from "expo-av";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -38,6 +39,7 @@ export default function PostCard({
   isFeedMuted = true,
   onToggleFeedMuted,
 }: PostCardProps) {
+  const isScreenFocused = useIsFocused();
   const [isFollowing, setIsFollowing] = useState(false);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [isMusicLoading, setIsMusicLoading] = useState(false);
@@ -95,7 +97,7 @@ export default function PostCard({
     let isCancelled = false;
 
     const syncPlaybackState = async () => {
-      if (isFeedMuted || !isActive) {
+      if (isFeedMuted || !isActive || !isScreenFocused) {
         if (soundRef.current) {
           await soundRef.current.stopAsync();
         }
@@ -141,7 +143,7 @@ export default function PostCard({
     return () => {
       isCancelled = true;
     };
-  }, [isActive, isFeedMuted, post.musicUrl]);
+  }, [isActive, isFeedMuted, isScreenFocused, post.musicUrl]);
 
   const handleOpenMusic = async () => {
     if (!post.musicUrl) {
