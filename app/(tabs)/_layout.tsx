@@ -1,15 +1,25 @@
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
-
+import { Image } from "react-native";
 const TabsLayout = () => {
   return (
-    <Tabs screenOptions={{ headerShown: false }}>
+    <Tabs
+      screenOptions={{
+        headerShown: false,
+        tabBarShowLabel: false,
+        tabBarActiveTintColor: "black",
+      }}
+    >
       <Tabs.Screen
         name="home"
         options={{
           title: "Home",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="home-outline" size={size} color={color} />
+          tabBarIcon: ({ color, size, focused }) => (
+            <MaterialCommunityIcons
+              name={focused ? "home-variant" : "home-variant-outline"}
+              size={focused ? size + 3 : size}
+              color={color}
+            />
           ),
         }}
       />
@@ -17,8 +27,12 @@ const TabsLayout = () => {
         name="search"
         options={{
           title: "Search",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="search-outline" size={size} color={color} />
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons
+              name={focused ? "search" : "search-outline"}
+              size={focused ? size + 3 : size}
+              color={color}
+            />
           ),
         }}
       />
@@ -26,8 +40,12 @@ const TabsLayout = () => {
         name="notification"
         options={{
           title: "Notification",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="notifications-outline" size={size} color={color} />
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons
+              name={focused ? "heart" : "heart-outline"}
+              size={focused ? size + 3 : size}
+              color={color}
+            />
           ),
         }}
       />
@@ -35,8 +53,17 @@ const TabsLayout = () => {
         name="profile"
         options={{
           title: "Profile",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="person-outline" size={size} color={color} />
+          tabBarIcon: ({ size, focused }) => (
+            <Image
+              source={require("../../assets/images/logo-app.jpg")}
+              style={{
+                width: size + 4,
+                height: size + 4,
+                borderRadius: 999,
+                borderWidth: focused ? 1.5 : 0,
+                borderColor: "#111",
+              }}
+            />
           ),
         }}
       />
