@@ -1,6 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useState } from "react";
+import { Audio, type AVPlaybackStatus } from "expo-av";
+import { useEffect, useRef, useState } from "react";
 import {
+  Alert,
   FlatList,
   Image,
   Modal,
@@ -20,17 +22,28 @@ export type Post = {
   images: string[];
   caption: string;
   likes: number;
+  musicUrl?: string;
 };
 
 type PostCardProps = {
   post: Post;
+  isActive?: boolean;
+  isFeedMuted?: boolean;
+  onToggleFeedMuted?: () => void;
 };
 
-export default function PostCard({ post }: PostCardProps) {
+export default function PostCard({
+  post,
+  isActive = true,
+  isFeedMuted = true,
+  onToggleFeedMuted,
+}: PostCardProps) {
   const [isFollowing, setIsFollowing] = useState(false);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
-  const [isMuted, setIsMuted] = useState(true);
+  const [isMusicLoading, setIsMusicLoading] = useState(false);
+  const [isPlayingMusic, setIsPlayingMusic] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const soundRef = useRef<Audio.Sound | null>(null);
   const { width: screenWidth } = useWindowDimensions();
   const imageWidth = screenWidth;
 
@@ -46,6 +59,96 @@ export default function PostCard({ post }: PostCardProps) {
     const maxIndex = Math.max(post.images.length - 1, 0);
     const safeIndex = Math.min(Math.max(newIndex, 0), maxIndex);
     setCurrentImageIndex(safeIndex);
+  };
+
+  useEffect(() => {
+    void Audio.setAudioModeAsync({
+      playsInSilentModeIOS: true,
+      staysActiveInBackground: false,
+      shouldDuckAndroid: true,
+      playThroughEarpieceAndroid: false,
+    });
+
+    return () => {
+      if (soundRef.current) {
+        void soundRef.current.unloadAsync();
+        soundRef.current = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    setIsPlayingMusic(false);
+    if (soundRef.current) {
+      void soundRef.current.unloadAsync();
+      soundRef.current = null;
+    }
+  }, [post.musicUrl]);
+
+  useEffect(() => {
+    const musicUrl = post.musicUrl;
+
+    if (!musicUrl) {
+      return;
+    }
+
+    let isCancelled = false;
+
+    const syncPlaybackState = async () => {
+      if (isFeedMuted || !isActive) {
+        if (soundRef.current) {
+          await soundRef.current.stopAsync();
+        }
+
+        if (!isCancelled) {
+          setIsPlayingMusic(false);
+        }
+        return;
+      }
+
+      if (!soundRef.current) {
+        const { sound } = await Audio.Sound.createAsync(
+          { uri: musicUrl },
+          { shouldPlay: true, isMuted: false }
+        );
+
+        sound.setOnPlaybackStatusUpdate((status: AVPlaybackStatus) => {
+          if (!status.isLoaded || isCancelled) {
+            return;
+          }
+
+          setIsPlayingMusic(status.isPlaying);
+        });
+
+        soundRef.current = sound;
+        if (!isCancelled) {
+          setIsPlayingMusic(true);
+        }
+        return;
+      }
+
+      await soundRef.current.setPositionAsync(0);
+      await soundRef.current.setIsMutedAsync(false);
+      await soundRef.current.playAsync();
+
+      if (!isCancelled) {
+        setIsPlayingMusic(true);
+      }
+    };
+
+    void syncPlaybackState();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [isActive, isFeedMuted, post.musicUrl]);
+
+  const handleOpenMusic = async () => {
+    if (!post.musicUrl) {
+      return;
+    }
+
+    onToggleFeedMuted?.();
   };
 
   return (
@@ -85,13 +188,15 @@ export default function PostCard({ post }: PostCardProps) {
           )}
         />
 
-        <Pressable style={styles.musicToggle} onPress={() => setIsMuted((prev) => !prev)}>
-          <Ionicons
-            name={isMuted ? "volume-mute" : "volume-high"}
-            size={16}
-            color="#fff"
-          />
-        </Pressable>
+        {post.musicUrl ? (
+          <Pressable style={styles.musicToggle} onPress={handleOpenMusic}>
+            <Ionicons
+              name={isMusicLoading ? "sync" : isFeedMuted ? "volume-mute" : "volume-high"}
+              size={16}
+              color="#fff"
+            />
+          </Pressable>
+        ) : null}
       </View>
 
       <View style={styles.dotsWrap}>

@@ -6,6 +6,9 @@ import { UserAvatar } from "../../components/UserAvatarItem";
 import { StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+const defaultMusicUrl =
+  "https://res.cloudinary.com/ddfrjhhro/video/upload/v1772453075/kayji_tizi-noi-nay-co-anh-em-co-anh-o-trong-oi-302568_apznck.mp3";
+
 const onlineUsers: UserAvatar[] = [
   {
     id: "1",
@@ -64,6 +67,7 @@ const posts: Post[] = [
     ],
     caption: "Outfit hôm nay đơn giản nhưng vẫn nổi bật ✨",
     likes: 1234,
+    musicUrl: defaultMusicUrl,
   },
   {
     id: "p2",
@@ -77,6 +81,7 @@ const posts: Post[] = [
     ],
     caption: "Street style cuối tuần cùng team.",
     likes: 856,
+    musicUrl: defaultMusicUrl,
   },
   {
     id: "p3",
@@ -90,6 +95,7 @@ const posts: Post[] = [
     ],
     caption: "Mix màu trung tính cho mùa này 🤍",
     likes: 2198,
+    musicUrl: defaultMusicUrl,
   },
 ];
 

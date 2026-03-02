@@ -1,5 +1,5 @@
-import { ReactElement } from "react";
-import { FlatList, StyleSheet } from "react-native";
+import { ReactElement, useRef, useState } from "react";
+import { FlatList, StyleSheet, type ViewToken } from "react-native";
 import PostCard, { Post } from "./PostCard";
 
 type PostsListProps = {
@@ -8,6 +8,20 @@ type PostsListProps = {
 };
 
 export default function PostsList({ posts, listHeaderComponent }: PostsListProps) {
+  const [activePostId, setActivePostId] = useState<string | null>(posts[0]?.id ?? null);
+  const [isFeedMuted, setIsFeedMuted] = useState(true);
+
+  const viewabilityConfigRef = useRef({
+    itemVisiblePercentThreshold: 70,
+  });
+
+  const onViewableItemsChanged = useRef(
+    ({ viewableItems }: { viewableItems: Array<ViewToken<Post>> }) => {
+      const firstVisiblePost = viewableItems.find((item) => item.isViewable)?.item;
+      setActivePostId(firstVisiblePost?.id ?? null);
+    }
+  );
+
   return (
     <FlatList
       data={posts}
@@ -15,7 +29,16 @@ export default function PostsList({ posts, listHeaderComponent }: PostsListProps
       showsVerticalScrollIndicator={false}
       ListHeaderComponent={listHeaderComponent}
       contentContainerStyle={styles.postsContent}
-      renderItem={({ item }) => <PostCard post={item} />}
+      viewabilityConfig={viewabilityConfigRef.current}
+      onViewableItemsChanged={onViewableItemsChanged.current}
+      renderItem={({ item }) => (
+        <PostCard
+          post={item}
+          isActive={item.id === activePostId}
+          isFeedMuted={isFeedMuted}
+          onToggleFeedMuted={() => setIsFeedMuted((prev) => !prev)}
+        />
+      )}
     />
   );
 }
