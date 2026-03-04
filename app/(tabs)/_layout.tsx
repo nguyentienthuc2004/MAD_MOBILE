@@ -50,6 +50,14 @@ const TabsLayout = () => {
         }}
       />
       <Tabs.Screen
+        name="chat"
+        options={{
+          // Ẩn tab Chat khỏi thanh tab, nhưng vẫn điều hướng được bằng router
+          href: null,
+          title: "Chat",
+        }}
+      />
+      <Tabs.Screen
         name="profile"
         options={{
           title: "Profile",

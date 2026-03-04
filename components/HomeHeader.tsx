@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { router } from "expo-router";
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 
 export default function HomeHeader() {
@@ -12,7 +13,10 @@ export default function HomeHeader() {
         <Text style={styles.logoText}>Social Media</Text>
       </View>
 
-      <Pressable style={styles.iconButton}>
+      <Pressable
+        style={styles.iconButton}
+        onPress={() => router.push("/(tabs)/chat")}
+      >
         <Ionicons name="paper-plane-outline" size={24} color="black" />
       </Pressable>
     </View>
