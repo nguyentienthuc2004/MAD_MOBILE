@@ -1,10 +1,10 @@
-import HomeHeader from "../../components/HomeHeader";
-import OnlineUsersList from "../../components/OnlineUsersList";
-import PostsList from "../../components/PostsList";
-import { Post } from "../../components/PostCard";
-import { UserAvatar } from "../../components/UserAvatarItem";
 import { StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import HomeHeader from "../../components/HomeHeader";
+import OnlineUsersList from "../../components/OnlineUsersList";
+import { Post } from "../../components/PostCard";
+import PostsList from "../../components/PostsList";
+import { UserAvatar } from "../../components/UserAvatarItem";
 
 const defaultMusicUrl =
   "https://res.cloudinary.com/ddfrjhhro/video/upload/v1772453075/kayji_tizi-noi-nay-co-anh-em-co-anh-o-trong-oi-302568_apznck.mp3";
@@ -41,8 +41,7 @@ const onlineUsers: UserAvatar[] = [
   {
     id: "5",
     name: "Trang",
-    avatar:
-      "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=200",
+    avatar: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=200",
     isOnline: true,
   },
   {
