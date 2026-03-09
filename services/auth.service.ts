@@ -8,7 +8,10 @@ export type AuthUser = {
   displayName?: string;
   avatar?: string;
   status?: string;
+  isDeleted?: boolean;
+  bio?: string;
   isOnline?: boolean;
+  lastOnlineAt?: string;
   createdAt?: string;
   updatedAt?: string;
 };
