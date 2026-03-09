@@ -1,4 +1,4 @@
-import { apiRequest, type ApiResponse } from "./api";
+import { apiAuthRequest, apiRequest, type ApiResponse } from "./api";
 
 export interface Post {
   _id: string;
@@ -14,7 +14,7 @@ export interface Post {
 }
 
 export const getPostsByUserId = (userId: string): Promise<ApiResponse<Post[]>> =>
-  apiRequest<ApiResponse<Post[]>>(`/posts/byUser/${userId}`, {
+  apiAuthRequest<ApiResponse<Post[]>>(`/posts/byUser/${userId}`, {
     method: "GET",
   });
 

@@ -20,9 +20,10 @@ const GRID_ITEM_SIZE = (Dimensions.get("window").width - GRID_GAP * 2) / 3;
 
 const ProfileScreen = () => {
   const user = useAuth((state) => state.user);
+  console.log("User in ProfileScreen:", user);
   const {request, loading, error} = useApi<ApiResponse<Post[]>>();
   const [posts, setPosts] = useState<Post[]>([]);
-
+  const logout = useAuth((state) => state.logout);
   useEffect(() => {
     const userId = user?._id;
 
@@ -52,7 +53,7 @@ const ProfileScreen = () => {
             <Feather name="plus-square" size={22} color="#111" />
           </Pressable>
 
-          <Pressable style={styles.headerIconButton}>
+          <Pressable style={styles.headerIconButton} onPress={logout}>
             <Ionicons name="menu-outline" size={24} color="#111" />
           </Pressable>
         </View>
@@ -60,7 +61,7 @@ const ProfileScreen = () => {
         <View style={styles.profileTopRow}>
           <Image
             source={{
-              uri: user?.avatar,
+              uri: user?.avatarUrl,
             }}
             style={styles.avatar}
           />

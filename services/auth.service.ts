@@ -6,7 +6,7 @@ export type AuthUser = {
   email: string;
   phoneNumber?: string;
   displayName?: string;
-  avatar?: string;
+  avatarUrl?: string;
   status?: string;
   isDeleted?: boolean;
   bio?: string;
