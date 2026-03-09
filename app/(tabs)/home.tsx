@@ -116,7 +116,7 @@ export default function Home() {
       }
 
       router.push({
-        pathname: "/chats/[roomId]",
+        pathname: "/(chats)/[roomId]",
         params: { roomId: room._id },
       });
     } catch (error: any) {

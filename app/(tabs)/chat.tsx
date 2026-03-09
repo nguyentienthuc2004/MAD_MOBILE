@@ -1,6 +1,7 @@
 import { useChatRooms } from "@/hooks/useChatRooms";
+import { useFocusEffect } from "@react-navigation/native";
 import { useRouter } from "expo-router";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
     FlatList,
     Image,
@@ -48,7 +49,7 @@ const onlineUsers: UserAvatar[] = [
 export default function ChatTabScreen() {
     const [search, setSearch] = useState("");
     const router = useRouter();
-    const { rooms, loading, error } = useChatRooms();
+    const { rooms, loading, error, refetch } = useChatRooms();
 
     const filteredOnlineUsers = useMemo(() => {
         const keyword = search.trim().toLowerCase();
@@ -57,6 +58,12 @@ export default function ChatTabScreen() {
             u.name.toLowerCase().includes(keyword)
         );
     }, [search]);
+
+    useFocusEffect(
+        useCallback(() => {
+            void refetch();
+        }, [refetch]),
+    );
 
     return (
         <SafeAreaView style={styles.container} edges={["top"]}>
@@ -99,8 +106,8 @@ export default function ChatTabScreen() {
                         style={styles.roomItem}
                         onPress={() =>
                             router.push({
-                                pathname: "/chats/[roomId]/messages",
-                                params: { roomId: item.id },
+                                pathname: "/(chats)/[roomId]",
+                                params: { roomId: item.id, name: item.name },
                             })
                         }
                     >
