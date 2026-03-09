@@ -3,7 +3,6 @@ import { useIsFocused } from "@react-navigation/native";
 import { Audio, type AVPlaybackStatus } from "expo-av";
 import { useEffect, useRef, useState } from "react";
 import {
-  Alert,
   FlatList,
   Image,
   Modal,
@@ -13,7 +12,7 @@ import {
   StyleSheet,
   Text,
   useWindowDimensions,
-  View,
+  View
 } from "react-native";
 
 export type Post = {
@@ -31,6 +30,7 @@ type PostCardProps = {
   isActive?: boolean;
   isFeedMuted?: boolean;
   onToggleFeedMuted?: () => void;
+  onPressMessage?: () => void;
 };
 
 export default function PostCard({
@@ -38,6 +38,7 @@ export default function PostCard({
   isActive = true,
   isFeedMuted = true,
   onToggleFeedMuted,
+  onPressMessage,
 }: PostCardProps) {
   const isScreenFocused = useIsFocused();
   const [isFollowing, setIsFollowing] = useState(false);
@@ -215,7 +216,7 @@ export default function PostCard({
           <Pressable style={styles.actionButton}>
             <Ionicons name="heart-outline" size={24} color="black" />
           </Pressable>
-          <Pressable style={styles.actionButton}>
+          <Pressable style={styles.actionButton} onPress={onPressMessage}>
             <Ionicons name="chatbubble-outline" size={22} color="black" />
           </Pressable>
           <Pressable style={styles.actionButton}>
@@ -240,7 +241,7 @@ export default function PostCard({
         onRequestClose={() => setShowMoreMenu(false)}
       >
         <Pressable style={styles.modalOverlay} onPress={() => setShowMoreMenu(false)}>
-          <Pressable style={styles.bottomSheet} onPress={() => {}}>
+          <Pressable style={styles.bottomSheet} onPress={() => { }}>
             {menuActions.map((action) => (
               <Pressable
                 key={action}

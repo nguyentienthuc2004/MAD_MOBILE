@@ -1,4 +1,6 @@
-import { StyleSheet, View } from "react-native";
+import { chatService } from "@/services/chat.service";
+import { useRouter } from "expo-router";
+import { Alert, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import HomeHeader from "../../components/HomeHeader";
 import OnlineUsersList from "../../components/OnlineUsersList";
@@ -99,12 +101,36 @@ const posts: Post[] = [
 ];
 
 export default function Home() {
+  const router = useRouter();
+
+  const handleOpenChatFromPost = async (post: Post) => {
+    // TODO: khi có dữ liệu thật, dùng _id user backend làm receiverId
+    const receiverId = post.id;
+
+    try {
+      const res = await chatService.createRoom(receiverId);
+      const room = res.data?.room;
+
+      if (!room) {
+        throw new Error("Không nhận được phòng chat");
+      }
+
+      router.push({
+        pathname: "/chats/[roomId]",
+        params: { roomId: room._id },
+      });
+    } catch (error: any) {
+      Alert.alert("Lỗi", error?.message || "Không mở được phòng chat");
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
       <HomeHeader />
       <View style={styles.content}>
         <PostsList
           posts={posts}
+          onPressMessage={handleOpenChatFromPost}
           listHeaderComponent={
             <View style={styles.onlineSection}>
               <OnlineUsersList

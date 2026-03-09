@@ -5,9 +5,10 @@ import PostCard, { Post } from "./PostCard";
 type PostsListProps = {
   posts: Post[];
   listHeaderComponent?: ReactElement;
+  onPressMessage?: (post: Post) => void;
 };
 
-export default function PostsList({ posts, listHeaderComponent }: PostsListProps) {
+export default function PostsList({ posts, listHeaderComponent, onPressMessage }: PostsListProps) {
   const [activePostId, setActivePostId] = useState<string | null>(posts[0]?.id ?? null);
   const [isFeedMuted, setIsFeedMuted] = useState(true);
 
@@ -37,6 +38,7 @@ export default function PostsList({ posts, listHeaderComponent }: PostsListProps
           isActive={item.id === activePostId}
           isFeedMuted={isFeedMuted}
           onToggleFeedMuted={() => setIsFeedMuted((prev) => !prev)}
+          onPressMessage={onPressMessage ? () => onPressMessage(item) : undefined}
         />
       )}
     />

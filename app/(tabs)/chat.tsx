@@ -1,6 +1,9 @@
+import { useChatRooms } from "@/hooks/useChatRooms";
+import { useRouter } from "expo-router";
 import { useMemo, useState } from "react";
 import {
     FlatList,
+    Image,
     Pressable,
     StyleSheet,
     Text,
@@ -10,13 +13,6 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import OnlineUsersList from "../../components/OnlineUsersList";
 import { UserAvatar } from "../../components/UserAvatarItem";
-
-type ChatRoom = {
-    id: string;
-    name: string;
-    lastMessage: string;
-    updatedAt: string;
-};
 
 const onlineUsers: UserAvatar[] = [
     {
@@ -49,101 +45,10 @@ const onlineUsers: UserAvatar[] = [
     },
 ];
 
-const chatRooms: ChatRoom[] = [
-    {
-        id: "1",
-        name: "Nhóm bạn thân",
-        lastMessage: "Cuối tuần này đi chơi nhé!",
-        updatedAt: "10:30",
-    },
-    {
-        id: "2",
-        name: "Lớp CNTT K16",
-        lastMessage: "Mai nộp bài tập đồ án nhớ.",
-        updatedAt: "09:15",
-    },
-    {
-        id: "3",
-        name: "Công ty ABC",
-        lastMessage: "Ok, mình nhận được file rồi.",
-        updatedAt: "Hôm qua",
-    },
-    {
-        id: "4",
-        name: "Gia đình",
-        lastMessage: "Nhớ gọi về cho mẹ nhé.",
-        updatedAt: "Hôm qua",
-    },
-    {
-        id: "5",
-        name: "Team đồ án",
-        lastMessage: "Tối nay họp Zoom lúc 8h.",
-        updatedAt: "Thứ 2",
-    },
-    {
-        id: "6",
-        name: "CLB Bóng đá",
-        lastMessage: "Cuối tuần đá sân trường cũ.",
-        updatedAt: "Thứ 3",
-    },
-    {
-        id: "7",
-        name: "Nhóm lớp cấp 3",
-        lastMessage: "Tụ họp kỷ niệm 10 năm nè.",
-        updatedAt: "Thứ 4",
-    },
-    {
-        id: "8",
-        name: "Công ty XYZ",
-        lastMessage: "File báo cáo em gửi rồi ạ.",
-        updatedAt: "Thứ 5",
-    },
-    {
-        id: "9",
-        name: "Hội anh em game",
-        lastMessage: "Đêm nay rank không?",
-        updatedAt: "Thứ 6",
-    },
-    {
-        id: "10",
-        name: "Nhóm đi Đà Lạt",
-        lastMessage: "Chốt lịch đặt vé xe đi.",
-        updatedAt: "Tuần trước",
-    },
-    {
-        id: "11",
-        name: "Lớp tiếng Anh",
-        lastMessage: "Mai có quiz nhỏ, nhớ ôn.",
-        updatedAt: "Tuần trước",
-    },
-    {
-        id: "12",
-        name: "Dự án freelance",
-        lastMessage: "Khách duyệt bản thiết kế rồi.",
-        updatedAt: "2 tuần trước",
-    },
-    {
-        id: "13",
-        name: "Nhóm học React Native",
-        lastMessage: "Tối nay live code phần chat.",
-        updatedAt: "2 tuần trước",
-    },
-    {
-        id: "14",
-        name: "Gym buddies",
-        lastMessage: "Mai tập ngực – tay sau nha.",
-        updatedAt: "3 tuần trước",
-    },
-    {
-        id: "15",
-        name: "Nhóm thử nghiệm app",
-        lastMessage: "Gửi feedback giao diện mới đi.",
-        updatedAt: "Tháng trước",
-    },
-];
-
 export default function ChatTabScreen() {
     const [search, setSearch] = useState("");
+    const router = useRouter();
+    const { rooms, loading, error } = useChatRooms();
 
     const filteredOnlineUsers = useMemo(() => {
         const keyword = search.trim().toLowerCase();
@@ -178,14 +83,35 @@ export default function ChatTabScreen() {
                 />
             </View>
 
+            {error ? (
+                <View style={styles.errorWrap}>
+                    <Text style={styles.errorText}>{error}</Text>
+                </View>
+            ) : null}
+
             <FlatList
-                data={chatRooms}
+                data={rooms}
                 keyExtractor={(item) => item.id}
                 contentContainerStyle={styles.listContent}
                 ItemSeparatorComponent={() => <View style={styles.separator} />}
                 renderItem={({ item }) => (
-                    <Pressable style={styles.roomItem} onPress={() => { }}>
-                        <View style={styles.avatarPlaceholder} />
+                    <Pressable
+                        style={styles.roomItem}
+                        onPress={() =>
+                            router.push({
+                                pathname: "/chats/[roomId]/messages",
+                                params: { roomId: item.id },
+                            })
+                        }
+                    >
+                        {item.avatar ? (
+                            <Image
+                                source={{ uri: item.avatar }}
+                                style={styles.avatarImage}
+                            />
+                        ) : (
+                            <View style={styles.avatarPlaceholder} />
+                        )}
                         <View style={styles.roomInfo}>
                             <Text style={styles.roomName} numberOfLines={1}>
                                 {item.name}
@@ -197,6 +123,15 @@ export default function ChatTabScreen() {
                         <Text style={styles.time}>{item.updatedAt}</Text>
                     </Pressable>
                 )}
+                ListEmptyComponent={
+                    !loading ? (
+                        <View style={styles.emptyWrap}>
+                            <Text style={styles.emptyText}>
+                                Bạn chưa có đoạn chat nào.
+                            </Text>
+                        </View>
+                    ) : null
+                }
             />
         </SafeAreaView>
     );
@@ -237,6 +172,14 @@ const styles = StyleSheet.create({
     listContent: {
         paddingVertical: 8,
     },
+    errorWrap: {
+        paddingHorizontal: 16,
+        paddingVertical: 4,
+    },
+    errorText: {
+        fontSize: 13,
+        color: "#dc2626",
+    },
     separator: {
         height: StyleSheet.hairlineWidth,
         backgroundColor: "#f0f0f0",
@@ -247,6 +190,13 @@ const styles = StyleSheet.create({
         alignItems: "center",
         paddingHorizontal: 16,
         paddingVertical: 10,
+    },
+    avatarImage: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        marginRight: 12,
+        backgroundColor: "#e5e5e5",
     },
     avatarPlaceholder: {
         width: 48,
@@ -271,5 +221,13 @@ const styles = StyleSheet.create({
         fontSize: 12,
         color: "#999",
         marginLeft: 8,
+    },
+    emptyWrap: {
+        paddingVertical: 16,
+        alignItems: "center",
+    },
+    emptyText: {
+        fontSize: 13,
+        color: "#6b7280",
     },
 });
