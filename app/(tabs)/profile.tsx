@@ -29,7 +29,7 @@ const GRID_ITEM_SIZE = (Dimensions.get("window").width - GRID_GAP * 2) / 3;
 
 const ProfileScreen = () => {
   const user = useAuth((state) => state.user);
-
+  const logout = useAuth((state) => state.logout);
   const profileHandle = user?.username ?? "fashionclub";
   const profileEmail = user?.email ?? "fashionclub@example.com";
 
@@ -45,7 +45,7 @@ const ProfileScreen = () => {
             <Feather name="plus-square" size={22} color="#111" />
           </Pressable>
 
-          <Pressable style={styles.headerIconButton}>
+          <Pressable style={styles.headerIconButton} onPress={logout}>
             <Ionicons name="menu-outline" size={24} color="#111" />
           </Pressable>
         </View>

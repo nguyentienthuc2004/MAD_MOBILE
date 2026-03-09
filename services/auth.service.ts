@@ -5,6 +5,7 @@ export type AuthUser = {
   username: string;
   email: string;
   phoneNumber?: string;
+  displayName?: string;
   avatar?: string;
   status?: string;
   isOnline?: boolean;
