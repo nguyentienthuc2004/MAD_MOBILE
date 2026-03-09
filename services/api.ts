@@ -4,6 +4,7 @@ import axios, {
     type AxiosInstance,
     type InternalAxiosRequestConfig,
     type RawAxiosRequestHeaders,
+
 } from "axios";
 import { Platform } from "react-native";
 
@@ -24,6 +25,13 @@ type ApiAuthConfig = {
 type RetryableRequestConfig = InternalAxiosRequestConfig & {
   skipAuthRefresh?: boolean;
   _retry?: boolean;
+};
+
+export type ApiResponse<T> = {
+  success: boolean;
+  message?: string;
+  code?: string;
+  data: T;
 };
 
 export class ApiError extends Error {
@@ -249,3 +257,4 @@ export const apiAuthRequest = <T>(
   path: string,
   options: ApiRequestOptions = {},
 ) => requestWithClient<T>(authClient, path, options);
+

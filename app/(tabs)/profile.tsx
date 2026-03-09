@@ -1,5 +1,9 @@
+import { useApi } from "@/hooks/useApi";
 import { useAuth } from "@/hooks/useAuth";
+import { ApiResponse } from "@/services/api";
+import {  Post, postService } from "@/services/post.service";
 import { Feather, Ionicons } from "@expo/vector-icons";
+import { useEffect, useState } from "react";
 import {
   Dimensions,
   Image,
@@ -11,27 +15,30 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-const POSTS = [
-  "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=900",
-  "https://images.unsplash.com/photo-1483985988355-763728e1935b?w=900",
-  "https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=900",
-  "https://images.unsplash.com/photo-1512436991641-6745cdb1723f?w=900",
-  "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=900",
-  "https://images.unsplash.com/photo-1445205170230-053b83016050?w=900",
-  "https://images.unsplash.com/photo-1487222477894-8943e31ef7b2?w=900",
-  "https://images.unsplash.com/photo-1467043237213-65f2da53396f?w=900",
-  "https://images.unsplash.com/photo-1611312449408-fcece27cdbb7?w=900",
-];
-
-
 const GRID_GAP = 2;
 const GRID_ITEM_SIZE = (Dimensions.get("window").width - GRID_GAP * 2) / 3;
 
 const ProfileScreen = () => {
   const user = useAuth((state) => state.user);
-  const logout = useAuth((state) => state.logout);
-  const profileHandle = user?.username ?? "fashionclub";
-  const profileEmail = user?.email ?? "fashionclub@example.com";
+  const {request, loading, error} = useApi<ApiResponse<Post[]>>();
+  const [posts, setPosts] = useState<Post[]>([]);
+
+  useEffect(() => {
+    const userId = user?._id;
+
+    if (!userId) {
+      setPosts([]);
+      return;
+    }
+
+    const fetchPosts = async () => {
+      console.log("Fetching posts for userId:", userId);
+      const res = await request(() => postService.getPostsByUserId(userId));
+      if (!res?.data) return;
+      setPosts(res.data);
+    };
+    void fetchPosts();
+  }, [request, user?._id]);
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
@@ -45,7 +52,7 @@ const ProfileScreen = () => {
             <Feather name="plus-square" size={22} color="#111" />
           </Pressable>
 
-          <Pressable style={styles.headerIconButton} onPress={logout}>
+          <Pressable style={styles.headerIconButton}>
             <Ionicons name="menu-outline" size={24} color="#111" />
           </Pressable>
         </View>
@@ -53,14 +60,14 @@ const ProfileScreen = () => {
         <View style={styles.profileTopRow}>
           <Image
             source={{
-              uri: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=600",
+              uri: user?.avatar,
             }}
             style={styles.avatar}
           />
 
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
-              <Text style={styles.statValue}>{POSTS.length}</Text>
+              <Text style={styles.statValue}>{posts.length}</Text>
               <Text style={styles.statLabel}>posts</Text>
             </View>
             <View style={styles.statItem}>
@@ -75,13 +82,10 @@ const ProfileScreen = () => {
         </View>
 
         <View style={styles.bioWrap}>
-          <Text style={styles.displayName}>Fashion Club Official</Text>
+          <Text style={styles.displayName}>{user?.displayName}</Text>
           <Text style={styles.bioText}>
-            Daily style inspiration. New drops every week.
+            {user?.bio}
           </Text>
-          <Text style={styles.bioMeta}>@{profileHandle}</Text>
-          <Text style={styles.bioMeta}>{profileEmail}</Text>
-          <Text style={styles.bioLink}>fashionclub.co</Text>
         </View>
 
         <View style={styles.postsDivider}>
@@ -89,8 +93,8 @@ const ProfileScreen = () => {
         </View>
 
         <View style={styles.gridWrap}>
-          {POSTS.map((img, index) => (
-            <Image key={index} source={{ uri: img }} style={styles.gridImage} />
+          {posts.map((item,index) => (
+            <Image key={index} source={{ uri: item.images[0] }} style={styles.gridImage} />
           ))}
         </View>
       </ScrollView>
