@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
     ActivityIndicator,
     FlatList,
+    Image,
     KeyboardAvoidingView,
     Platform,
     Pressable,
@@ -14,7 +15,8 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { chatService, type MessageDto } from "@/services/chat.service";
+import { chatService, type MessageDto, type RoomChatDto, type RoomUser } from "@/services/chat.service";
+import { socket } from "@/socket/socket";
 import { useAuth } from "@/stores/auth.store";
 
 type ChatMessage = {
@@ -33,6 +35,7 @@ export default function ChatRoomScreen() {
     const [loading, setLoading] = useState(true);
     const [sending, setSending] = useState(false);
     const [input, setInput] = useState("");
+    const [room, setRoom] = useState<RoomChatDto | null>(null);
 
     const meId = user?._id ?? null;
 
@@ -72,6 +75,62 @@ export default function ChatRoomScreen() {
         };
 
         void fetchMessages();
+    }, [roomId, meId]);
+
+    useEffect(() => {
+        if (!roomId) return;
+
+        const fetchRoom = async () => {
+            try {
+                const res = await chatService.getRooms();
+                const apiRooms: RoomChatDto[] = res.data?.rooms ?? [];
+                const found = apiRooms.find((r) => r._id === roomId);
+                if (found) {
+                    setRoom(found);
+                }
+            } catch {
+                // bỏ qua lỗi, chỉ ảnh hưởng phần UI trống
+            }
+        };
+
+        void fetchRoom();
+    }, [roomId]);
+
+    // Lắng nghe tin nhắn realtime qua Socket.IO
+    useEffect(() => {
+        if (!roomId) return;
+
+        const roomKey = String(roomId);
+
+        const handleIncoming = (m: MessageDto) => {
+            const createdAtText = m.createdAt
+                ? new Date(m.createdAt).toLocaleTimeString("vi-VN", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                })
+                : "";
+
+            const newMsg: ChatMessage = {
+                id: m._id,
+                content: m.content,
+                isMine: meId ? m.sender_id === meId : false,
+                createdAt: createdAtText,
+            };
+
+            setMessages((prev) => {
+                // Tránh thêm trùng tin nhắn nếu đã có
+                if (prev.some((item) => item.id === newMsg.id)) return prev;
+                return [...prev, newMsg];
+            });
+        };
+
+        // Tham gia room và lắng nghe sự kiện
+        socket.emit("JOIN_ROOM", roomKey);
+        socket.on("SEVER_SEND_MESSAGE", handleIncoming);
+
+        return () => {
+            socket.off("SEVER_SEND_MESSAGE", handleIncoming);
+        };
     }, [roomId, meId]);
 
     const handleSend = async () => {
@@ -140,6 +199,17 @@ export default function ChatRoomScreen() {
         );
     };
 
+    const otherMembers: RoomUser[] = room?.users
+        ? room.users.filter((u) => (meId ? u.user_id !== meId : true))
+        : [];
+
+    const otherUser: RoomUser | undefined =
+        room?.typeRoom === "friend"
+            ? otherMembers[0] ?? room.users?.[0]
+            : undefined;
+
+    const isGroup = room?.typeRoom === "group";
+
     return (
         <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
             <View style={styles.header}>
@@ -160,6 +230,95 @@ export default function ChatRoomScreen() {
                     {loading ? (
                         <View style={styles.loadingWrap}>
                             <ActivityIndicator />
+                        </View>
+                    ) : messages.length === 0 ? (
+                        <View style={styles.emptyRoomWrap}>
+                            {isGroup && room ? (
+                                <>
+                                    <View style={styles.groupHeaderEmpty}>
+                                        <View style={styles.groupAvatarEmpty}>
+                                            {room.avatar ? (
+                                                <Image
+                                                    source={{ uri: String(room.avatar) }}
+                                                    style={styles.groupAvatarImage}
+                                                />
+                                            ) : (
+                                                <Ionicons
+                                                    name="people-outline"
+                                                    size={24}
+                                                    color="#6b7280"
+                                                />
+                                            )}
+                                        </View>
+                                        <Text style={styles.emptyTitle} numberOfLines={1}>
+                                            {String(room.title || name || "Nhóm chat")}
+                                        </Text>
+                                    </View>
+                                    {otherMembers.length > 0 ? (
+                                        <View style={styles.membersRowEmpty}>
+                                            {otherMembers.map((m) => (
+                                                <View
+                                                    key={m.user_id}
+                                                    style={styles.memberAvatarSmall}
+                                                >
+                                                    {m.avatar ? (
+                                                        <Image
+                                                            source={{ uri: m.avatar }}
+                                                            style={styles.memberAvatarImage}
+                                                        />
+                                                    ) : (
+                                                        <Text style={styles.memberAvatarInitial}>
+                                                            {m.nickname.charAt(0).toUpperCase()}
+                                                        </Text>
+                                                    )}
+                                                </View>
+                                            ))}
+                                        </View>
+                                    ) : null}
+                                    {otherMembers.length > 0 ? (
+                                        <Text style={styles.emptySubtitle}>
+                                            {`Bạn đã thêm ${otherMembers
+                                                .map((m) => m.nickname)
+                                                .join(", ")} vào nhóm`}
+                                        </Text>
+                                    ) : null}
+                                </>
+                            ) : otherUser ? (
+                                <>
+                                    <View style={styles.otherUserHeaderEmpty}>
+                                        {otherUser.avatar ? (
+                                            <Image
+                                                source={{ uri: otherUser.avatar }}
+                                                style={styles.otherUserAvatarImage}
+                                            />
+                                        ) : (
+                                            <View style={styles.otherUserAvatarFallback}>
+                                                <Text style={styles.otherUserAvatarInitial}>
+                                                    {otherUser.nickname
+                                                        .charAt(0)
+                                                        .toUpperCase()}
+                                                </Text>
+                                            </View>
+                                        )}
+                                        <Text style={styles.emptyTitle} numberOfLines={1}>
+                                            {otherUser.nickname}
+                                        </Text>
+                                    </View>
+                                    <Text style={styles.emptySubtitle}>
+                                        Bắt đầu cuộc trò chuyện với {otherUser.nickname}
+                                    </Text>
+                                    <Pressable
+                                        style={styles.profileButton}
+                                        onPress={() => {
+                                            // TODO: điều hướng sang trang cá nhân khi có màn user profile
+                                        }}
+                                    >
+                                        <Text style={styles.profileButtonText}>
+                                            Xem trang cá nhân
+                                        </Text>
+                                    </Pressable>
+                                </>
+                            ) : null}
                         </View>
                     ) : (
                         <FlatList
@@ -251,6 +410,99 @@ const styles = StyleSheet.create({
         flex: 1,
         alignItems: "center",
         justifyContent: "center",
+    },
+    emptyRoomWrap: {
+        flex: 1,
+        alignItems: "center",
+        justifyContent: "center",
+        paddingHorizontal: 24,
+    },
+    emptyTitle: {
+        marginTop: 8,
+        fontSize: 16,
+        fontWeight: "600",
+        color: "#111",
+        textAlign: "center",
+    },
+    emptySubtitle: {
+        marginTop: 6,
+        fontSize: 13,
+        color: "#6b7280",
+        textAlign: "center",
+    },
+    otherUserHeaderEmpty: {
+        alignItems: "center",
+    },
+    otherUserAvatarImage: {
+        width: 72,
+        height: 72,
+        borderRadius: 36,
+    },
+    otherUserAvatarFallback: {
+        width: 72,
+        height: 72,
+        borderRadius: 36,
+        backgroundColor: "#e5e7eb",
+        alignItems: "center",
+        justifyContent: "center",
+    },
+    otherUserAvatarInitial: {
+        fontSize: 28,
+        fontWeight: "700",
+        color: "#4b5563",
+    },
+    profileButton: {
+        marginTop: 10,
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 18,
+        borderWidth: StyleSheet.hairlineWidth,
+        borderColor: "#d1d5db",
+    },
+    profileButtonText: {
+        fontSize: 13,
+        fontWeight: "500",
+        color: "#111",
+    },
+    groupHeaderEmpty: {
+        alignItems: "center",
+    },
+    groupAvatarEmpty: {
+        width: 72,
+        height: 72,
+        borderRadius: 36,
+        backgroundColor: "#e5e7eb",
+        alignItems: "center",
+        justifyContent: "center",
+    },
+    groupAvatarImage: {
+        width: 72,
+        height: 72,
+        borderRadius: 36,
+    },
+    membersRowEmpty: {
+        flexDirection: "row",
+        alignItems: "center",
+        marginTop: 10,
+    },
+    memberAvatarSmall: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: "#e5e7eb",
+        alignItems: "center",
+        justifyContent: "center",
+        marginHorizontal: 3,
+    },
+    memberAvatarImage: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+    },
+    memberAvatarInitial: {
+        fontSize: 14,
+        fontWeight: "600",
+        color: "#4b5563",
     },
     messageRow: {
         flexDirection: "row",
