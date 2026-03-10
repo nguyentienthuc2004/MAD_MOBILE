@@ -1,4 +1,5 @@
 import { useChatRooms } from "@/hooks/useChatRooms";
+import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { useRouter } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
@@ -69,6 +70,12 @@ export default function ChatTabScreen() {
         <SafeAreaView style={styles.container} edges={["top"]}>
             <View style={styles.header}>
                 <Text style={styles.headerTitle}>Tin nhắn</Text>
+                <Pressable
+                    style={styles.newMessageButton}
+                    onPress={() => router.push("/(chats)/search")}
+                >
+                    <Ionicons name="create-outline" size={22} color="#0a84ff" />
+                </Pressable>
             </View>
 
             <View style={styles.searchWrap}>
@@ -156,10 +163,16 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
         borderBottomWidth: StyleSheet.hairlineWidth,
         borderBottomColor: "#e5e5e5",
+        justifyContent: "space-between",
     },
     headerTitle: {
         fontSize: 18,
         fontWeight: "600",
+    },
+    newMessageButton: {
+        paddingHorizontal: 6,
+        paddingVertical: 6,
+        borderRadius: 16,
     },
     searchWrap: {
         paddingHorizontal: 16,
