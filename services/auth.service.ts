@@ -1,4 +1,4 @@
-import { apiAuthRequest, apiRequest } from "./api";
+import { apiAuthRequest, apiRequest, ApiResponse } from "./api";
 
 export type AuthUser = {
   _id: string;
@@ -21,12 +21,12 @@ export type AuthTokens = {
   refreshToken: string;
 };
 
-type ApiEnvelope<T> = {
-  success: boolean;
-  message?: string;
-  code?: string;
-  data: T;
-};
+// type ApiEnvelope<T> = {
+//   success: boolean;
+//   message?: string;
+//   code?: string;
+//   data: T;
+// };
 
 export type AuthSession = {
   user: AuthUser;
@@ -49,35 +49,35 @@ export type LoginPayload = {
 
 export const authService = {
   register(payload: RegisterPayload) {
-    return apiRequest<ApiEnvelope<AuthSession>>("/auth/register", {
+    return apiRequest<ApiResponse<AuthSession>>("/auth/register", {
       method: "POST",
       body: payload,
     });
   },
 
   login(payload: LoginPayload) {
-    return apiRequest<ApiEnvelope<AuthSession>>("/auth/login", {
+    return apiRequest<ApiResponse<AuthSession>>("/auth/login", {
       method: "POST",
       body: payload,
     });
   },
 
   refresh(refreshToken: string) {
-    return apiRequest<ApiEnvelope<AuthTokens>>("/auth/refresh", {
+    return apiRequest<ApiResponse<AuthTokens>>("/auth/refresh", {
       method: "POST",
       body: { refreshToken },
     });
   },
 
   logout(refreshToken?: string) {
-    return apiAuthRequest<ApiEnvelope<{ message?: string }>>("/auth/logout", {
+    return apiAuthRequest<ApiResponse<{ message?: string }>>("/auth/logout", {
       method: "POST",
       body: refreshToken ? { refreshToken } : {},
     });
   },
 
   logoutAll() {
-    return apiAuthRequest<ApiEnvelope<{ message?: string }>>(
+    return apiAuthRequest<ApiResponse<{ message?: string }>>(
       "/auth/logout-all",
       {
         method: "POST",
@@ -86,7 +86,7 @@ export const authService = {
   },
 
   me() {
-    return apiAuthRequest<ApiEnvelope<AuthUser>>("/auth/me", {
+    return apiAuthRequest<ApiResponse<AuthUser>>("/auth/me", {
       method: "GET",
     });
   },
