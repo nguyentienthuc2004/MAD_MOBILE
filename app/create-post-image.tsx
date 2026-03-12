@@ -3,15 +3,13 @@ import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import * as MediaLibrary from "expo-media-library";
 import { useRouter } from "expo-router";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Dimensions,
   FlatList,
   Image,
-  Modal,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -19,51 +17,76 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const MAX_IMAGES = 10;
-const GRID_GAP = 8;
-const GRID_ITEM_SIZE = (Dimensions.get("window").width - 32 - GRID_GAP * 2) / 3;
-const MODAL_GRID_GAP = 3;
-const MODAL_HORIZONTAL_PADDING = 6;
-const MODAL_GRID_ITEM_SIZE =
-  (Dimensions.get("window").width - MODAL_HORIZONTAL_PADDING * 2 - MODAL_GRID_GAP * 2) / 3;
+const SCREEN_WIDTH = Dimensions.get("window").width;
+const PREVIEW_SIZE = SCREEN_WIDTH;
+const THUMB_GAP = 1;
+const THUMB_SIZE = (SCREEN_WIDTH - THUMB_GAP * 3) / 4;
 
 export default function CreatePostImageScreen() {
   const router = useRouter();
-  const [isPickerVisible, setPickerVisible] = useState(false);
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [loadingAssets, setLoadingAssets] = useState(false);
   const [assets, setAssets] = useState<MediaLibrary.Asset[]>([]);
   const [selectedAssetIds, setSelectedAssetIds] = useState<string[]>([]);
   const [fallbackSelectedUris, setFallbackSelectedUris] = useState<string[]>([]);
-  const hasAutoOpenedPickerRef = useRef(false);
+  const [isMultiSelectEnabled, setIsMultiSelectEnabled] = useState(false);
 
   const canContinue = selectedAssetIds.length > 0;
 
-  const helperText = useMemo(() => {
-    if (selectedAssetIds.length >= MAX_IMAGES) {
-      return "Bạn đã chọn tối đa 10 ảnh";
-    }
+  const assetMap = useMemo(
+    () => new Map(assets.map((item) => [item.id, item])),
+    [assets]
+  );
 
-    return "Chọn từ 1 đến 10 ảnh để tiếp tục";
-  }, [selectedAssetIds.length]);
+  const selectedOrderMap = useMemo(
+    () =>
+      new Map(selectedAssetIds.map((assetId, index) => [assetId, index + 1])),
+    [selectedAssetIds]
+  );
 
-  const selectedPreviewUris = useMemo(() => {
+  const selectedPreviewUri = useMemo(() => {
     if (fallbackSelectedUris.length > 0) {
-      return fallbackSelectedUris.slice(0, 6);
+      return fallbackSelectedUris[0];
     }
 
-    if (selectedAssetIds.length === 0) return [];
+    if (selectedAssetIds.length > 0) {
+      const firstSelectedAsset = assetMap.get(selectedAssetIds[0]);
+      if (firstSelectedAsset) {
+        return firstSelectedAsset.uri;
+      }
+    }
 
-    const assetMap = new Map(assets.map((item) => [item.id, item]));
+    return assets[0]?.uri ?? null;
+  }, [assetMap, assets, fallbackSelectedUris, selectedAssetIds]);
+
+  const selectedAssetUris = useMemo(() => {
+    if (fallbackSelectedUris.length > 0) {
+      return fallbackSelectedUris.slice(0, MAX_IMAGES);
+    }
+
     return selectedAssetIds
-      .map((assetId) => assetMap.get(assetId))
-      .filter((item): item is MediaLibrary.Asset => Boolean(item))
-      .map((item) => item.uri)
-      .slice(0, 6);
-  }, [assets, fallbackSelectedUris, selectedAssetIds]);
+      .map((assetId) => assetMap.get(assetId)?.uri)
+      .filter((uri): uri is string => Boolean(uri))
+      .slice(0, MAX_IMAGES);
+  }, [assetMap, fallbackSelectedUris, selectedAssetIds]);
+
+  const selectionHelperText = useMemo(() => {
+    if (hasPermission === false) {
+      return "Cần cấp quyền thư viện để tiếp tục";
+    }
+
+    if (isMultiSelectEnabled) {
+      return `Đã chọn ${selectedAssetIds.length}/${MAX_IMAGES}`;
+    }
+
+    if (selectedAssetIds.length === 0) {
+      return "Chọn 1 ảnh để tiếp tục";
+    }
+
+    return "Chế độ chọn 1 ảnh";
+  }, [hasPermission, isMultiSelectEnabled, selectedAssetIds.length]);
 
   const openSystemImagePicker = useCallback(async () => {
-    setPickerVisible(false);
-
     try {
       const pickerResult = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -83,109 +106,147 @@ export default function CreatePostImageScreen() {
 
       setSelectedAssetIds(normalized.map((item) => item.id));
       setFallbackSelectedUris(normalized.map((item) => item.uri));
+      setIsMultiSelectEnabled(normalized.length > 1);
     } catch (error) {
       console.log("System picker error:", error);
     }
   }, []);
 
-  const loadPhotos = useCallback(async () => {
-    setLoadingAssets(true);
-    try {
-      const baseOptions = {
-        first: 120,
-        mediaType: [MediaLibrary.MediaType.photo],
-        sortBy: [MediaLibrary.SortBy.creationTime],
-      };
+  const fetchRecentAssets = useCallback(async () => {
+    const baseOptions = {
+      first: 160,
+      mediaType: [MediaLibrary.MediaType.photo],
+      sortBy: [MediaLibrary.SortBy.creationTime],
+    };
 
-      const albums = await MediaLibrary.getAlbumsAsync();
-      const preferredAlbum = albums.find((album) =>
-        /download|picture|camera/i.test(album.title)
-      );
+    const albums = await MediaLibrary.getAlbumsAsync();
+    const preferredAlbum = albums.find((album) =>
+      /download|picture|camera/i.test(album.title)
+    );
 
-      let result = preferredAlbum
-        ? await MediaLibrary.getAssetsAsync({
-            ...baseOptions,
-            album: preferredAlbum.id,
-          })
-        : await MediaLibrary.getAssetsAsync(baseOptions);
+    let result = preferredAlbum
+      ? await MediaLibrary.getAssetsAsync({
+          ...baseOptions,
+          album: preferredAlbum.id,
+        })
+      : await MediaLibrary.getAssetsAsync(baseOptions);
 
-      if (result.assets.length === 0 && preferredAlbum) {
-        result = await MediaLibrary.getAssetsAsync(baseOptions);
-      }
-
-      setAssets(result.assets);
-    } catch (error) {
-      console.log("Load photos error:", error);
-    } finally {
-      setLoadingAssets(false);
+    if (result.assets.length === 0 && preferredAlbum) {
+      result = await MediaLibrary.getAssetsAsync(baseOptions);
     }
+
+    return result.assets;
   }, []);
 
-  const openPhotoPicker = useCallback(async () => {
-    setPickerVisible(true);
-
+  const requestPermissionAndLoadAssets = useCallback(async () => {
+    setLoadingAssets(true);
     try {
       const permissionResponse = await MediaLibrary.requestPermissionsAsync(false, ["photo"]);
       setHasPermission(permissionResponse.granted);
 
       if (!permissionResponse.granted) {
-        setPickerVisible(false);
+        setAssets([]);
         return;
       }
 
-      setFallbackSelectedUris([]);
-      await loadPhotos();
+      const nextAssets = await fetchRecentAssets();
+      setAssets(nextAssets);
     } catch (error) {
-      console.log("MediaLibrary permission error:", error);
-      await openSystemImagePicker();
+      console.log("Media library permission error:", error);
+      setHasPermission(false);
+    } finally {
+      setLoadingAssets(false);
     }
-  }, [loadPhotos, openSystemImagePicker]);
+  }, [fetchRecentAssets]);
 
-  const toggleAssetSelection = (assetId: string) => {
-    setSelectedAssetIds((prev) => {
-      if (prev.includes(assetId)) {
-        return prev.filter((item) => item !== assetId);
+  const handleSelectAsset = useCallback(
+    (assetId: string) => {
+      setFallbackSelectedUris([]);
+
+      if (!isMultiSelectEnabled) {
+        setSelectedAssetIds([assetId]);
+        return;
       }
 
-      if (prev.length >= MAX_IMAGES) {
+      setSelectedAssetIds((prev) => {
+        if (prev.includes(assetId)) {
+          return prev.filter((item) => item !== assetId);
+        }
+
+        if (prev.length >= MAX_IMAGES) {
+          return prev;
+        }
+
+        return [...prev, assetId];
+      });
+    },
+    [isMultiSelectEnabled]
+  );
+
+  useEffect(() => {
+    void requestPermissionAndLoadAssets();
+  }, [requestPermissionAndLoadAssets]);
+
+  useEffect(() => {
+    if (isMultiSelectEnabled) {
+      return;
+    }
+
+    setSelectedAssetIds((prev) => {
+      if (prev.length <= 1) {
         return prev;
       }
 
-      return [...prev, assetId];
+      return [prev[0]];
     });
-  };
+  }, [isMultiSelectEnabled]);
 
   useEffect(() => {
-    if (hasAutoOpenedPickerRef.current) return;
+    if (fallbackSelectedUris.length > 0) {
+      return;
+    }
 
-    hasAutoOpenedPickerRef.current = true;
+    if (assets.length === 0) {
+      return;
+    }
 
-    const autoOpenTimer = setTimeout(() => {
-      void openPhotoPicker();
-    }, 200);
+    if (selectedAssetIds.length > 0) {
+      return;
+    }
 
-    return () => clearTimeout(autoOpenTimer);
-  }, [openPhotoPicker]);
+    setSelectedAssetIds([assets[0].id]);
+  }, [assets, fallbackSelectedUris.length, selectedAssetIds.length]);
+
+  const toggleMultiSelect = useCallback(() => {
+    setIsMultiSelectEnabled((prev) => !prev);
+  }, []);
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
+    <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
       <View style={styles.header}>
-        <BackButton href="/(tabs)/profile" />
+        <View style={styles.headerLeft}>
+          <BackButton href="/(tabs)/profile" />
+        </View>
+
         <Text style={styles.headerTitle}>Bài viết mới</Text>
+
         <Pressable
           disabled={!canContinue}
-          style={[styles.nextButton, !canContinue && styles.nextButtonDisabled]}
+          style={styles.headerRight}
           onPress={() =>
             router.push({
-              pathname: "/create-post-details",
-              params: { selectedCount: String(selectedAssetIds.length) },
+              pathname: "/create-post-music",
+              params: {
+                selectedCount: String(selectedAssetUris.length || selectedAssetIds.length),
+                selectedUris: JSON.stringify(selectedAssetUris),
+              },
             })
           }
         >
           <Text
             style={[
-              styles.nextButtonText,
-              !canContinue && styles.nextButtonTextDisabled,
+              styles.nextText,
+              !canContinue && styles.nextTextDisabled,
             ]}
           >
             Tiếp
@@ -193,113 +254,153 @@ export default function CreatePostImageScreen() {
         </Pressable>
       </View>
 
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.contentContainer}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.summaryCard}>
-          <Text style={styles.summaryTitle}>Chọn ảnh cho bài viết mới</Text>
-          <Text style={styles.summarySubTitle}>{helperText}</Text>
-          <Text style={styles.summaryCounterText}>
-            Đã chọn {selectedAssetIds.length}/{MAX_IMAGES}
-          </Text>
-        </View>
-
-        {selectedPreviewUris.length > 0 ? (
-          <View style={styles.gridWrap}>
-            {selectedPreviewUris.map((uri, index) => (
-              <Image
-                key={`${uri}-${index}`}
-                source={{ uri }}
-                style={styles.gridImage}
-              />
-            ))}
-          </View>
+      <View style={styles.previewSection}>
+        {selectedPreviewUri ? (
+          <Image source={{ uri: selectedPreviewUri }} style={styles.previewImage} />
         ) : (
-          <View style={styles.emptyWrap}>
-            <Text style={styles.emptyText}>Chưa có ảnh nào được chọn</Text>
+          <View style={styles.previewPlaceholder}>
+            <Ionicons name="images-outline" size={28} color="rgba(255, 255, 255, 0.8)" />
+            <Text style={styles.previewPlaceholderText}>Chưa có ảnh nào</Text>
           </View>
         )}
-      </ScrollView>
 
-      <Modal
-        visible={isPickerVisible}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setPickerVisible(false)}
-      >
-        <View style={styles.modalRoot}>
+        <View style={styles.previewActions}>
           <Pressable
-            style={styles.modalBackdrop}
-            onPress={() => setPickerVisible(false)}
-          />
+            style={styles.previewActionButton}
+            onPress={openSystemImagePicker}
+            hitSlop={8}
+          >
+            <Ionicons name="images-outline" size={18} color="#fff" />
+          </Pressable>
 
-          <View style={styles.sheetContainer}>
-            <View style={styles.sheetHandle} />
-
-            <View style={styles.sheetHeader}>
-              <Text style={styles.sheetTitle}>Ảnh từ điện thoại</Text>
-              <Pressable onPress={() => setPickerVisible(false)}>
-                <Text style={styles.sheetDoneText}>Xong</Text>
-              </Pressable>
-            </View>
-
-            {loadingAssets ? (
-              <View style={styles.modalCenterContent}>
-                <ActivityIndicator size="small" color="#111" />
-                <Text style={styles.modalHelperText}>Đang tải ảnh...</Text>
-              </View>
-            ) : hasPermission === false ? (
-              <View style={styles.modalCenterContent}>
-                <Text style={styles.modalHelperText}>
-                  Cần cấp quyền thư viện để hiển thị ảnh
-                </Text>
-                <Pressable style={styles.permissionButton} onPress={openPhotoPicker}>
-                  <Text style={styles.permissionButtonText}>Cấp quyền lại</Text>
-                </Pressable>
-              </View>
-            ) : (
-              <FlatList
-                data={assets}
-                keyExtractor={(item) => item.id}
-                numColumns={3}
-                contentContainerStyle={styles.modalGridContent}
-                columnWrapperStyle={styles.modalColumn}
-                renderItem={({ item }) => {
-                  const isSelected = selectedAssetIds.includes(item.id);
-
-                  return (
-                    <Pressable
-                      style={styles.modalImageWrap}
-                      onPress={() => toggleAssetSelection(item.id)}
-                    >
-                      <Image source={{ uri: item.uri }} style={styles.modalImage} />
-                      <View
-                        style={[
-                          styles.checkCircle,
-                          isSelected && styles.checkCircleSelected,
-                        ]}
-                      >
-                        {isSelected ? (
-                          <Ionicons name="checkmark" size={13} color="#fff" />
-                        ) : null}
-                      </View>
-                    </Pressable>
-                  );
-                }}
-                ListEmptyComponent={
-                  <View style={styles.modalCenterContent}>
-                    <Text style={styles.modalHelperText}>
-                      Không có ảnh nào trong thư viện
-                    </Text>
-                  </View>
-                }
-              />
-            )}
-          </View>
+          <Pressable
+            style={[
+              styles.previewActionButton,
+              isMultiSelectEnabled && styles.previewActionButtonActive,
+            ]}
+            onPress={toggleMultiSelect}
+            hitSlop={8}
+          >
+            <Ionicons name="copy-outline" size={18} color="#fff" />
+          </Pressable>
         </View>
-      </Modal>
+      </View>
+
+      <View style={styles.galleryHeader}>
+        <Pressable
+          style={styles.albumButton}
+          onPress={requestPermissionAndLoadAssets}
+          hitSlop={8}
+        >
+          <Text style={styles.albumButtonText}>Gần đây</Text>
+          <Ionicons name="chevron-down" size={16} color="#111" />
+        </Pressable>
+
+        <Pressable
+          style={[
+            styles.multiSelectButton,
+            isMultiSelectEnabled && styles.multiSelectButtonActive,
+          ]}
+          onPress={toggleMultiSelect}
+        >
+          <Ionicons
+            name={isMultiSelectEnabled ? "checkmark-circle" : "ellipse-outline"}
+            size={17}
+            color={isMultiSelectEnabled ? "#fff" : "#111"}
+          />
+          <Text
+            style={[
+              styles.multiSelectButtonText,
+              isMultiSelectEnabled && styles.multiSelectButtonTextActive,
+            ]}
+          >
+            CHỌN NHIỀU
+          </Text>
+        </Pressable>
+      </View>
+
+      <Text style={styles.selectionHelperText}>{selectionHelperText}</Text>
+
+      <View style={styles.galleryContent}>
+        {loadingAssets ? (
+          <View style={styles.centerState}>
+            <ActivityIndicator size="small" color="#111" />
+            <Text style={styles.centerStateText}>Đang tải ảnh...</Text>
+          </View>
+        ) : hasPermission === false ? (
+          <View style={styles.centerState}>
+            <Text style={styles.centerStateText}>
+              Cần cấp quyền thư viện để hiển thị ảnh trên thiết bị
+            </Text>
+
+            <Pressable
+              style={styles.primaryActionButton}
+              onPress={requestPermissionAndLoadAssets}
+            >
+              <Text style={styles.primaryActionButtonText}>Cấp quyền thư viện</Text>
+            </Pressable>
+
+            <Pressable
+              style={styles.secondaryActionButton}
+              onPress={openSystemImagePicker}
+            >
+              <Text style={styles.secondaryActionButtonText}>
+                Mở trình chọn hệ thống
+              </Text>
+            </Pressable>
+          </View>
+        ) : assets.length === 0 ? (
+          <View style={styles.centerState}>
+            <Text style={styles.centerStateText}>Không có ảnh nào trong thư viện</Text>
+
+            <Pressable
+              style={styles.primaryActionButton}
+              onPress={openSystemImagePicker}
+            >
+              <Text style={styles.primaryActionButtonText}>Chọn ảnh từ hệ thống</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <FlatList
+            data={assets}
+            keyExtractor={(item) => item.id}
+            numColumns={4}
+            contentContainerStyle={styles.thumbnailContent}
+            columnWrapperStyle={styles.thumbnailRow}
+            showsVerticalScrollIndicator={false}
+            renderItem={({ item }) => {
+              const selectedOrder = selectedOrderMap.get(item.id);
+              const isSelected = typeof selectedOrder === "number";
+
+              return (
+                <Pressable
+                  style={styles.thumbnailItem}
+                  onPress={() => handleSelectAsset(item.id)}
+                >
+                  <Image source={{ uri: item.uri }} style={styles.thumbnailImage} />
+
+                  {isSelected ? <View style={styles.thumbnailOverlay} /> : null}
+
+                  <View
+                    style={[
+                      styles.thumbnailBadge,
+                      isSelected && styles.thumbnailBadgeSelected,
+                    ]}
+                  >
+                    {isSelected ? (
+                      isMultiSelectEnabled ? (
+                        <Text style={styles.thumbnailBadgeText}>{selectedOrder}</Text>
+                      ) : (
+                        <Ionicons name="checkmark" size={13} color="#fff" />
+                      )
+                    ) : null}
+                  </View>
+                </Pressable>
+              );
+            }}
+          />
+        )}
+      </View>
     </SafeAreaView>
   );
 }
@@ -310,193 +411,203 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
   },
   header: {
-    height: 52,
-    paddingHorizontal: 16,
+    minHeight: 52,
+    paddingHorizontal: 12,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "#e5e7eb",
+    borderBottomColor: "#efefef",
+  },
+  headerLeft: {
+    width: 42,
+    alignItems: "flex-start",
   },
   headerTitle: {
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: "700",
     color: "#111",
   },
-  nextButton: {
-    minWidth: 86,
-    height: 32,
-    borderRadius: 16,
-    paddingHorizontal: 12,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#111",
+  headerRight: {
+    minWidth: 42,
+    alignItems: "flex-end",
   },
-  nextButtonDisabled: {
-    backgroundColor: "#e5e7eb",
-  },
-  nextButtonText: {
-    fontSize: 13,
+  nextText: {
+    fontSize: 16,
     fontWeight: "700",
-    color: "#fff",
+    color: "#0095f6",
   },
-  nextButtonTextDisabled: {
+  nextTextDisabled: {
     color: "#9ca3af",
   },
-  scrollView: {
-    flex: 1,
+  previewSection: {
+    width: PREVIEW_SIZE,
+    height: PREVIEW_SIZE,
+    backgroundColor: "#0f0f0f",
   },
-  contentContainer: {
-    padding: 16,
-    gap: 14,
-  },
-  summaryCard: {
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-    backgroundColor: "#f9fafb",
-    padding: 14,
-    gap: 6,
-  },
-  summaryTitle: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: "#111",
-  },
-  summarySubTitle: {
-    fontSize: 13,
-    color: "#6b7280",
-  },
-  summaryCounterText: {
-    marginTop: 2,
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#111",
-  },
-  gridWrap: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: GRID_GAP,
-  },
-  gridImage: {
-    width: GRID_ITEM_SIZE,
-    height: GRID_ITEM_SIZE,
-    borderRadius: 12,
-  },
-  emptyWrap: {
-    height: 130,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderStyle: "dashed",
-    borderColor: "#d1d5db",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#f9fafb",
-  },
-  emptyText: {
-    fontSize: 13,
-    color: "#6b7280",
-  },
-  modalRoot: {
-    flex: 1,
-    justifyContent: "flex-end",
-  },
-  modalBackdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0, 0, 0, 0.35)",
-  },
-  sheetContainer: {
-    height: "78%",
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    backgroundColor: "#fff",
-    overflow: "hidden",
-  },
-  sheetHandle: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: "#d1d5db",
-    alignSelf: "center",
-    marginTop: 8,
-    marginBottom: 6,
-  },
-  sheetHeader: {
-    minHeight: 42,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "#e5e7eb",
-    paddingHorizontal: 14,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  sheetTitle: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: "#111",
-  },
-  sheetDoneText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#2563eb",
-  },
-  modalGridContent: {
-    paddingBottom: 18,
-    paddingHorizontal: MODAL_HORIZONTAL_PADDING,
-  },
-  modalColumn: {
-    marginBottom: MODAL_GRID_GAP,
-    justifyContent: "space-between",
-  },
-  modalImageWrap: {
-    width: MODAL_GRID_ITEM_SIZE,
-    height: MODAL_GRID_ITEM_SIZE,
-  },
-  modalImage: {
+  previewImage: {
     width: "100%",
     height: "100%",
   },
-  checkCircle: {
-    position: "absolute",
-    top: 7,
-    right: 7,
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 2,
-    borderColor: "#fff",
-    backgroundColor: "rgba(17, 17, 17, 0.24)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  checkCircleSelected: {
-    backgroundColor: "#2563eb",
-    borderColor: "#dbeafe",
-  },
-  modalCenterContent: {
+  previewPlaceholder: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    gap: 8,
-    paddingHorizontal: 20,
   },
-  modalHelperText: {
+  previewPlaceholderText: {
+    marginTop: 8,
+    fontSize: 13,
+    color: "rgba(255, 255, 255, 0.82)",
+  },
+  previewActions: {
+    position: "absolute",
+    right: 12,
+    bottom: 12,
+    flexDirection: "row",
+  },
+  previewActionButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: "rgba(0, 0, 0, 0.48)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginLeft: 8,
+  },
+  previewActionButtonActive: {
+    backgroundColor: "#0095f6",
+  },
+  galleryHeader: {
+    minHeight: 48,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  albumButton: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  albumButtonText: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#111",
+    marginRight: 3,
+  },
+  multiSelectButton: {
+    minHeight: 30,
+    borderRadius: 15,
+    borderWidth: 1,
+    borderColor: "#d1d5db",
+    paddingHorizontal: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#fff",
+  },
+  multiSelectButtonActive: {
+    backgroundColor: "#0095f6",
+    borderColor: "#0095f6",
+  },
+  multiSelectButtonText: {
+    marginLeft: 4,
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#111",
+  },
+  multiSelectButtonTextActive: {
+    color: "#fff",
+  },
+  selectionHelperText: {
+    paddingHorizontal: 12,
+    marginBottom: 8,
+    fontSize: 12,
+    color: "#6b7280",
+  },
+  galleryContent: {
+    flex: 1,
+  },
+  centerState: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 24,
+  },
+  centerStateText: {
+    marginTop: 10,
     fontSize: 13,
     color: "#6b7280",
     textAlign: "center",
   },
-  permissionButton: {
-    minWidth: 104,
-    height: 34,
-    borderRadius: 17,
+  primaryActionButton: {
+    minHeight: 36,
+    borderRadius: 18,
+    backgroundColor: "#111",
+    paddingHorizontal: 16,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#111",
-    paddingHorizontal: 12,
+    marginTop: 14,
   },
-  permissionButtonText: {
+  primaryActionButtonText: {
     fontSize: 13,
     fontWeight: "600",
+    color: "#fff",
+  },
+  secondaryActionButton: {
+    minHeight: 34,
+    borderRadius: 17,
+    borderWidth: 1,
+    borderColor: "#d1d5db",
+    paddingHorizontal: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 10,
+  },
+  secondaryActionButtonText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#111",
+  },
+  thumbnailContent: {
+    paddingBottom: 24,
+  },
+  thumbnailRow: {
+    justifyContent: "space-between",
+    marginBottom: THUMB_GAP,
+  },
+  thumbnailItem: {
+    width: THUMB_SIZE,
+    height: THUMB_SIZE,
+    backgroundColor: "#f3f4f6",
+  },
+  thumbnailImage: {
+    width: "100%",
+    height: "100%",
+  },
+  thumbnailOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0, 0, 0, 0.28)",
+  },
+  thumbnailBadge: {
+    position: "absolute",
+    top: 6,
+    right: 6,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 1.5,
+    borderColor: "#fff",
+    backgroundColor: "rgba(17, 17, 17, 0.28)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  thumbnailBadgeSelected: {
+    backgroundColor: "#0095f6",
+    borderColor: "#fff",
+  },
+  thumbnailBadgeText: {
+    fontSize: 11,
+    fontWeight: "700",
     color: "#fff",
   },
 });
