@@ -1,7 +1,10 @@
+import { useAuth } from "@/stores/auth.store";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
+import { useState } from "react";
 import { Image } from "react-native";
 const TabsLayout = () => {
+  const user = useAuth((state) => state.user);
   return (
     <Tabs
       screenOptions={{
@@ -63,7 +66,7 @@ const TabsLayout = () => {
           title: "Profile",
           tabBarIcon: ({ size, focused }) => (
             <Image
-              source={require("../../assets/images/logo-app.jpg")}
+              source={{ uri: user?.avatarUrl }}
               style={{
                 width: size + 4,
                 height: size + 4,

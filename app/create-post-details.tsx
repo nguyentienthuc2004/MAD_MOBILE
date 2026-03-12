@@ -1,8 +1,12 @@
 import BackButton from "@/components/BackButton";
+import { useApi } from "@/hooks/useApi";
+import { type ApiResponse } from "@/services/api";
+import { type Post, postService } from "@/services/post.service";
 import { Feather, Ionicons } from "@expo/vector-icons";
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useMemo, useState } from "react";
 import {
+  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -13,42 +17,115 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const MAX_CAPTION = 500;
+const MAX_IMAGES = 10;
+
+const parseSelectedUris = (value: string | string[] | undefined): string[] => {
+  const rawValue = Array.isArray(value) ? value[0] : value;
+
+  if (!rawValue) {
+    return [];
+  }
+
+  try {
+    const parsedValue = JSON.parse(rawValue);
+
+    if (!Array.isArray(parsedValue)) {
+      return [];
+    }
+
+    return parsedValue
+      .filter((uri): uri is string => typeof uri === "string" && uri.length > 0)
+      .slice(0, MAX_IMAGES);
+  } catch {
+    return [];
+  }
+};
+
+const parseHashtagsInput = (value: string) => {
+  const normalized = value
+    .split(/[,#]/g)
+    .map((item) => item.trim().replace(/^#+/, "").toLowerCase())
+    .filter(Boolean);
+
+  return Array.from(new Set(normalized));
+};
 
 export default function CreatePostDetailsScreen() {
-  const params = useLocalSearchParams<{ selectedCount?: string }>();
+  const router = useRouter();
+  const { request, loading, error } = useApi<ApiResponse<Post>>();
+
+  const params = useLocalSearchParams<{
+    selectedCount?: string;
+    selectedUris?: string | string[];
+    selectedMusic?: string;
+    selectedMusicId?: string;
+  }>();
+
   const [caption, setCaption] = useState("");
   const [hashtags, setHashtags] = useState("");
-  const [selectedMusic, setSelectedMusic] = useState<string | null>(null);
 
-  const selectedCountNumber = Number(params.selectedCount ?? 0);
-  const selectedCount = Number.isFinite(selectedCountNumber)
-    ? selectedCountNumber
-    : 0;
+  const selectedImageUris = useMemo(
+    () => parseSelectedUris(params.selectedUris),
+    [params.selectedUris]
+  );
 
-  const isPublishDisabled = useMemo(() => {
-    const hasCaption = caption.trim().length > 0;
-    const hasHashtag = hashtags.trim().length > 0;
-    return !hasCaption && !hasHashtag && !selectedMusic;
-  }, [caption, hashtags, selectedMusic]);
+  const selectedCountNumber = Number(params.selectedCount ?? selectedImageUris.length);
+  const selectedCount =
+    Number.isFinite(selectedCountNumber) && selectedCountNumber > 0
+      ? selectedCountNumber
+      : selectedImageUris.length;
+
+  const firstSelectedImage = selectedImageUris[0] ?? null;
+
+  const selectedMusic =
+    typeof params.selectedMusic === "string" ? params.selectedMusic : "";
+
+  const selectedMusicId =
+    typeof params.selectedMusicId === "string" ? params.selectedMusicId : null;
+
+  const hashtagList = useMemo(() => parseHashtagsInput(hashtags), [hashtags]);
+
+  const postPayload = useMemo(
+    () => ({
+      caption: caption.trim(),
+      hashtags: hashtagList,
+      musicId: selectedMusicId,
+      images: selectedImageUris,
+    }),
+    [caption, hashtagList, selectedImageUris, selectedMusicId]
+  );
+
+  const isPublishDisabled = useMemo(
+    () => selectedImageUris.length === 0 || loading,
+    [loading, selectedImageUris.length]
+  );
+
+  const handlePublish = async () => {
+    console.log("Create post payload:", postPayload);
+
+    const res = await request(() => postService.createPost(postPayload));
+    if (!res?.data) {
+      return;
+    }
+
+    console.log("Create post success:", res.data);
+    router.replace("/(tabs)/profile");
+  };
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
+    <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
       <View style={styles.header}>
-        <BackButton href="/create-post-image" />
-        <Text style={styles.headerTitle}>Thong tin bai viet</Text>
+        <View style={styles.headerLeft}>
+          <BackButton href="/create-post-music" />
+        </View>
+
+        <Text style={styles.headerTitle}>Bài viết mới</Text>
+
         <Pressable
           disabled={isPublishDisabled}
-          style={[
-            styles.publishButton,
-            isPublishDisabled && styles.publishButtonDisabled,
-          ]}
+          style={styles.publishButtonWrap}
           onPress={() => {
-            console.log("Create post details:", {
-              caption,
-              hashtags,
-              selectedMusic,
-              selectedCount,
-            });
+            void handlePublish();
           }}
         >
           <Text
@@ -57,81 +134,121 @@ export default function CreatePostDetailsScreen() {
               isPublishDisabled && styles.publishButtonTextDisabled,
             ]}
           >
-            Dang
+            {loading ? "Đang đăng..." : "Đăng"}
           </Text>
         </Pressable>
       </View>
+
+      {error ? (
+        <View style={styles.errorBanner}>
+          <Text style={styles.errorBannerText}>{error}</Text>
+        </View>
+      ) : null}
 
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.contentContainer}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={styles.selectedInfoCard}>
-          <Ionicons name="images-outline" size={20} color="#111" />
-          <Text style={styles.selectedInfoText}>Da chon {selectedCount} anh</Text>
-        </View>
+        <View style={styles.composeCard}>
+          <View style={styles.composeHeaderRow}>
+            <View style={styles.authorWrap}>
+              <View style={styles.avatarPlaceholder}>
+                <Ionicons name="person" size={14} color="#6b7280" />
+              </View>
+              <Text style={styles.authorName}>Bạn</Text>
+            </View>
 
-        <View style={styles.fieldGroup}>
-          <Text style={styles.fieldLabel}>Noi dung</Text>
-          <TextInput
-            value={caption}
-            onChangeText={(text) => setCaption(text.slice(0, MAX_CAPTION))}
-            placeholder="Ban dang nghi gi?"
-            placeholderTextColor="#9ca3af"
-            multiline
-            textAlignVertical="top"
-            style={styles.captionInput}
-          />
-          <Text style={styles.helperText}>
+            <Text style={styles.selectedInfoText}>Đã chọn {selectedCount} ảnh</Text>
+          </View>
+
+          <View style={styles.composeMainRow}>
+            <TextInput
+              value={caption}
+              onChangeText={(text) => setCaption(text.slice(0, MAX_CAPTION))}
+              placeholder="Viết chú thích..."
+              placeholderTextColor="#9ca3af"
+              multiline
+              textAlignVertical="top"
+              style={styles.captionInput}
+            />
+
+            <View style={styles.heroImageWrap}>
+              {firstSelectedImage ? (
+                <Image source={{ uri: firstSelectedImage }} style={styles.heroImage} />
+              ) : (
+                <View style={styles.heroPlaceholder}>
+                  <Ionicons name="image-outline" size={18} color="#9ca3af" />
+                </View>
+              )}
+            </View>
+          </View>
+
+          <Text style={styles.captionCounterText}>
             {caption.length}/{MAX_CAPTION}
           </Text>
         </View>
 
-        <View style={styles.fieldGroup}>
-          <Text style={styles.fieldLabel}>Hashtag</Text>
-          <View style={styles.hashtagWrap}>
-            <Feather name="hash" size={16} color="#6b7280" />
-            <TextInput
-              value={hashtags}
-              onChangeText={setHashtags}
-              placeholder="fashion, ootd"
-              placeholderTextColor="#9ca3af"
-              autoCapitalize="none"
-              style={styles.hashtagInput}
-            />
-          </View>
-          <Text style={styles.helperText}>
-            Cach nhau boi dau phay, vi du: fashion, ootd
-          </Text>
-        </View>
+        <View style={styles.infoRowCard}>
+          <View style={styles.infoRowLeft}>
+            <Ionicons name="musical-notes-outline" size={18} color="#111" />
 
-        <View style={styles.fieldGroup}>
-          <Text style={styles.fieldLabel}>Nhac</Text>
-          <Pressable
-            style={styles.musicPicker}
-            onPress={() =>
-              setSelectedMusic((prev) =>
-                prev ? null : "Lofi Chill - Demo track"
-              )
-            }
-          >
-            <View style={styles.musicLeftWrap}>
-              <Ionicons name="musical-notes-outline" size={18} color="#111" />
-              <Text style={styles.musicText}>
-                {selectedMusic ?? "Chon nhac nen"}
+            <View style={styles.infoRowTextWrap}>
+              <Text style={styles.infoRowLabel}>Nhạc</Text>
+              <Text style={styles.selectedMusicText} numberOfLines={1}>
+                {selectedMusic || "Chưa chọn nhạc"}
               </Text>
             </View>
-            <Ionicons
-              name={selectedMusic ? "close-circle" : "chevron-forward"}
-              size={18}
-              color="#6b7280"
-            />
-          </Pressable>
-          <Text style={styles.helperText}>
-            Tam thoi dung mau demo, se noi API o buoc tiep theo
-          </Text>
+          </View>
+
+          <Text style={styles.infoRowBadge}>{selectedMusicId ? "Đã chọn" : "Không"}</Text>
         </View>
+
+        <View style={styles.hashtagCard}>
+          <View style={styles.hashtagLabelRow}>
+            <Feather name="hash" size={16} color="#111" />
+            <Text style={styles.fieldLabel}>Hashtag</Text>
+          </View>
+
+          <TextInput
+            value={hashtags}
+            onChangeText={setHashtags}
+            placeholder="#fashion, #ootd"
+            placeholderTextColor="#9ca3af"
+            autoCapitalize="none"
+            style={styles.hashtagInput}
+          />
+
+          <Text style={styles.helperText}>
+            Tách bởi dấu phẩy hoặc #, ví dụ: #fashion, #ootd
+          </Text>
+
+          {hashtagList.length > 0 ? (
+            <Text style={styles.hashtagPreviewText}>#{hashtagList.join(" #")}</Text>
+          ) : null}
+        </View>
+
+        {selectedImageUris.length > 0 ? (
+          <View style={styles.galleryCard}>
+            <Text style={styles.galleryTitle}>Ảnh đã chọn</Text>
+
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.previewRowContent}
+            >
+              {selectedImageUris.map((uri, index) => (
+                <View key={`${uri}-${index}`} style={styles.previewItemWrap}>
+                  <Image source={{ uri }} style={styles.previewImage} />
+                  <View style={styles.previewIndexBadge}>
+                    <Text style={styles.previewIndexText}>{index + 1}</Text>
+                  </View>
+                </View>
+              ))}
+            </ScrollView>
+          </View>
+        ) : null}
+
       </ScrollView>
     </SafeAreaView>
   );
@@ -143,120 +260,260 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
   },
   header: {
-    height: 52,
-    paddingHorizontal: 16,
+    minHeight: 52,
+    paddingHorizontal: 12,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "#e5e7eb",
+    borderBottomColor: "#efefef",
+  },
+  headerLeft: {
+    width: 48,
+    alignItems: "flex-start",
   },
   headerTitle: {
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: "700",
     color: "#111",
   },
-  publishButton: {
-    minWidth: 54,
-    height: 32,
-    borderRadius: 16,
-    paddingHorizontal: 12,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#111",
-  },
-  publishButtonDisabled: {
-    backgroundColor: "#e5e7eb",
+  publishButtonWrap: {
+    minWidth: 48,
+    alignItems: "flex-end",
   },
   publishButtonText: {
-    fontSize: 13,
+    fontSize: 16,
     fontWeight: "700",
-    color: "#fff",
+    color: "#0095f6",
   },
   publishButtonTextDisabled: {
     color: "#9ca3af",
+  },
+  errorBanner: {
+    marginHorizontal: 14,
+    marginTop: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+    backgroundColor: "#fef2f2",
+    borderWidth: 1,
+    borderColor: "#fecaca",
+  },
+  errorBannerText: {
+    fontSize: 12,
+    color: "#b91c1c",
   },
   scrollView: {
     flex: 1,
   },
   contentContainer: {
-    padding: 16,
+    padding: 14,
     gap: 16,
+    paddingBottom: 28,
   },
-  selectedInfoCard: {
-    minHeight: 42,
-    borderRadius: 12,
+  composeCard: {
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: "#e5e7eb",
-    backgroundColor: "#f9fafb",
+    borderColor: "#efefef",
+    backgroundColor: "#fff",
+    padding: 12,
+    gap: 10,
+  },
+  composeHeaderRow: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 12,
+    justifyContent: "space-between",
+  },
+  authorWrap: {
+    flexDirection: "row",
+    alignItems: "center",
     gap: 8,
   },
-  selectedInfoText: {
+  avatarPlaceholder: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "#f3f4f6",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  authorName: {
     fontSize: 13,
     fontWeight: "600",
     color: "#111",
   },
-  fieldGroup: {
+  selectedInfoText: {
+    fontSize: 12,
+    color: "#6b7280",
+    fontWeight: "500",
+  },
+  composeMainRow: {
+    minHeight: 108,
+    flexDirection: "row",
+    gap: 10,
+  },
+  captionInput: {
+    flex: 1,
+    minHeight: 108,
+    fontSize: 15,
+    color: "#111",
+    paddingVertical: 2,
+    textAlignVertical: "top",
+  },
+  heroImageWrap: {
+    width: 90,
+    height: 90,
+    borderRadius: 10,
+    overflow: "hidden",
+    backgroundColor: "#f3f4f6",
+  },
+  heroImage: {
+    width: "100%",
+    height: "100%",
+  },
+  heroPlaceholder: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  captionCounterText: {
+    fontSize: 12,
+    color: "#6b7280",
+    textAlign: "right",
+  },
+  infoRowCard: {
+    minHeight: 54,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#efefef",
+    backgroundColor: "#fff",
+    paddingHorizontal: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  infoRowLeft: {
+    flexDirection: "row",
+    alignItems: "center",
     gap: 8,
+    flexShrink: 1,
+  },
+  infoRowTextWrap: {
+    flex: 1,
+  },
+  infoRowLabel: {
+    fontSize: 12,
+    color: "#6b7280",
+  },
+  infoRowBadge: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#2563eb",
+    backgroundColor: "#eff6ff",
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    overflow: "hidden",
+  },
+  selectedMusicText: {
+    marginTop: 1,
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#111",
+  },
+  hashtagCard: {
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#efefef",
+    backgroundColor: "#fff",
+    padding: 12,
+    gap: 8,
+  },
+  hashtagLabelRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
   },
   fieldLabel: {
     fontSize: 14,
     fontWeight: "700",
     color: "#111",
   },
-  captionInput: {
-    minHeight: 150,
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 14,
-    color: "#111",
-    backgroundColor: "#fff",
-  },
-  hashtagWrap: {
-    minHeight: 44,
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    backgroundColor: "#fff",
-  },
   hashtagInput: {
-    flex: 1,
-    fontSize: 14,
-    color: "#111",
-    paddingVertical: 0,
-  },
-  musicPicker: {
-    minHeight: 46,
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-    borderRadius: 12,
+    minHeight: 44,
+    borderRadius: 10,
+    backgroundColor: "#f3f4f6",
     paddingHorizontal: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    backgroundColor: "#fff",
-  },
-  musicLeftWrap: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    flexShrink: 1,
-  },
-  musicText: {
+    paddingVertical: 8,
     fontSize: 14,
     color: "#111",
   },
   helperText: {
+    fontSize: 12,
+    color: "#6b7280",
+  },
+  hashtagPreviewText: {
+    fontSize: 12,
+    color: "#2563eb",
+    fontWeight: "600",
+  },
+  galleryCard: {
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#efefef",
+    backgroundColor: "#fff",
+    padding: 12,
+    gap: 10,
+  },
+  galleryTitle: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#111",
+  },
+  previewRowContent: {
+    gap: 8,
+  },
+  previewItemWrap: {
+    width: 72,
+    height: 72,
+    borderRadius: 10,
+    overflow: "hidden",
+  },
+  previewImage: {
+    width: "100%",
+    height: "100%",
+  },
+  previewIndexBadge: {
+    position: "absolute",
+    top: 4,
+    right: 4,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.58)",
+    paddingHorizontal: 4,
+  },
+  previewIndexText: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: "#fff",
+  },
+  payloadHintCard: {
+    borderRadius: 12,
+    backgroundColor: "#f9fafb",
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    padding: 12,
+  },
+  payloadHintTitle: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#111",
+  },
+  payloadHintText: {
+    marginTop: 4,
     fontSize: 12,
     color: "#6b7280",
   },
