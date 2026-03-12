@@ -12,7 +12,7 @@ import {
   StyleSheet,
   Text,
   useWindowDimensions,
-  View
+  View,
 } from "react-native";
 
 export type Post = {
@@ -31,6 +31,7 @@ type PostCardProps = {
   isFeedMuted?: boolean;
   onToggleFeedMuted?: () => void;
   onPressMessage?: () => void;
+  onPressComment?: () => void;
 };
 
 export default function PostCard({
@@ -39,6 +40,7 @@ export default function PostCard({
   isFeedMuted = true,
   onToggleFeedMuted,
   onPressMessage,
+  onPressComment,
 }: PostCardProps) {
   const isScreenFocused = useIsFocused();
   const [isFollowing, setIsFollowing] = useState(false);
@@ -50,13 +52,11 @@ export default function PostCard({
   const { width: screenWidth } = useWindowDimensions();
   const imageWidth = screenWidth;
 
-  const menuActions = [
-    "Quan tâm",
-    "Không quan tâm",
-    "Chặn người dùng",
-  ];
+  const menuActions = ["Quan tâm", "Không quan tâm", "Chặn người dùng"];
 
-  const handleImageScrollEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+  const handleImageScrollEnd = (
+    event: NativeSyntheticEvent<NativeScrollEvent>,
+  ) => {
     const offsetX = event.nativeEvent.contentOffset.x;
     const newIndex = Math.round(offsetX / imageWidth);
     const maxIndex = Math.max(post.images.length - 1, 0);
@@ -112,7 +112,7 @@ export default function PostCard({
       if (!soundRef.current) {
         const { sound } = await Audio.Sound.createAsync(
           { uri: musicUrl },
-          { shouldPlay: true, isMuted: false }
+          { shouldPlay: true, isMuted: false },
         );
 
         sound.setOnPlaybackStatusUpdate((status: AVPlaybackStatus) => {
@@ -166,11 +166,16 @@ export default function PostCard({
             onPress={() => setIsFollowing((prev) => !prev)}
             style={styles.followButton}
           >
-            <Text style={[styles.followText, isFollowing && styles.followingText]}>
+            <Text
+              style={[styles.followText, isFollowing && styles.followingText]}
+            >
               {isFollowing ? "Đang theo dõi" : "Theo dõi"}
             </Text>
           </Pressable>
-          <Pressable onPress={() => setShowMoreMenu(true)} style={styles.moreButton}>
+          <Pressable
+            onPress={() => setShowMoreMenu(true)}
+            style={styles.moreButton}
+          >
             <Ionicons name="ellipsis-horizontal" size={18} color="black" />
           </Pressable>
         </View>
@@ -187,14 +192,23 @@ export default function PostCard({
           keyExtractor={(_, index) => `${post.id}-${index}`}
           onMomentumScrollEnd={handleImageScrollEnd}
           renderItem={({ item }) => (
-            <Image source={{ uri: item }} style={[styles.postImage, { width: imageWidth }]} />
+            <Image
+              source={{ uri: item }}
+              style={[styles.postImage, { width: imageWidth }]}
+            />
           )}
         />
 
         {post.musicUrl ? (
           <Pressable style={styles.musicToggle} onPress={handleOpenMusic}>
             <Ionicons
-              name={isMusicLoading ? "sync" : isFeedMuted ? "volume-mute" : "volume-high"}
+              name={
+                isMusicLoading
+                  ? "sync"
+                  : isFeedMuted
+                    ? "volume-mute"
+                    : "volume-high"
+              }
               size={16}
               color="#fff"
             />
@@ -206,7 +220,10 @@ export default function PostCard({
         {post.images.map((_, index) => (
           <View
             key={`${post.id}-dot-${index}`}
-            style={[styles.dot, index === currentImageIndex && styles.activeDot]}
+            style={[
+              styles.dot,
+              index === currentImageIndex && styles.activeDot,
+            ]}
           />
         ))}
       </View>
@@ -216,10 +233,13 @@ export default function PostCard({
           <Pressable style={styles.actionButton}>
             <Ionicons name="heart-outline" size={24} color="black" />
           </Pressable>
-          <Pressable style={styles.actionButton} onPress={onPressMessage}>
+          <Pressable
+            style={styles.actionButton}
+            onPress={onPressComment ?? onPressMessage}
+          >
             <Ionicons name="chatbubble-outline" size={22} color="black" />
           </Pressable>
-          <Pressable style={styles.actionButton}>
+          <Pressable style={styles.actionButton} onPress={onPressMessage}>
             <Ionicons name="paper-plane-outline" size={22} color="black" />
           </Pressable>
         </View>
@@ -240,8 +260,11 @@ export default function PostCard({
         animationType="slide"
         onRequestClose={() => setShowMoreMenu(false)}
       >
-        <Pressable style={styles.modalOverlay} onPress={() => setShowMoreMenu(false)}>
-          <Pressable style={styles.bottomSheet} onPress={() => { }}>
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setShowMoreMenu(false)}
+        >
+          <Pressable style={styles.bottomSheet} onPress={() => {}}>
             {menuActions.map((action) => (
               <Pressable
                 key={action}
@@ -249,14 +272,20 @@ export default function PostCard({
                 onPress={() => setShowMoreMenu(false)}
               >
                 <Text
-                  style={[styles.menuText, action === "Báo cáo" && styles.dangerText]}
+                  style={[
+                    styles.menuText,
+                    action === "Báo cáo" && styles.dangerText,
+                  ]}
                 >
                   {action}
                 </Text>
               </Pressable>
             ))}
 
-            <Pressable style={styles.cancelButton} onPress={() => setShowMoreMenu(false)}>
+            <Pressable
+              style={styles.cancelButton}
+              onPress={() => setShowMoreMenu(false)}
+            >
               <Text style={styles.cancelText}>Hủy</Text>
             </Pressable>
           </Pressable>

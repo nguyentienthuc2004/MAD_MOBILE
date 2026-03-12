@@ -57,8 +57,8 @@ const onlineUsers: UserAvatar[] = [
 
 const posts: Post[] = [
   {
-    id: "p1",
-    userName: "Linh",
+    id: "69a6fccfac8ba95f1b64c9b8",
+    userName: "Thuc",
     userAvatar:
       "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200",
     images: [
@@ -124,6 +124,13 @@ export default function Home() {
     }
   };
 
+  const handleOpenComments = (post: Post) => {
+    void router.push({
+      pathname: "/posts/[postId]/comments",
+      params: { postId: post.id, username: post.userName },
+    });
+  };
+
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
       <HomeHeader />
@@ -131,6 +138,7 @@ export default function Home() {
         <PostsList
           posts={posts}
           onPressMessage={handleOpenChatFromPost}
+          onPressComment={handleOpenComments}
           listHeaderComponent={
             <View style={styles.onlineSection}>
               <OnlineUsersList
