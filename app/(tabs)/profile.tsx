@@ -3,6 +3,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { ApiResponse } from "@/services/api";
 import {  Post, postService } from "@/services/post.service";
 import { Feather, Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
   Dimensions,
@@ -19,8 +20,8 @@ const GRID_GAP = 2;
 const GRID_ITEM_SIZE = (Dimensions.get("window").width - GRID_GAP * 2) / 3;
 
 const ProfileScreen = () => {
+  const router = useRouter();
   const user = useAuth((state) => state.user);
-  console.log("User in ProfileScreen:", user);
   const {request, loading, error} = useApi<ApiResponse<Post[]>>();
   const [posts, setPosts] = useState<Post[]>([]);
   const logout = useAuth((state) => state.logout);
@@ -49,7 +50,10 @@ const ProfileScreen = () => {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.headerRow}>
-          <Pressable style={styles.headerIconButton}>
+          <Pressable
+            style={styles.headerIconButton}
+            onPress={() => router.push("/create-post-image")}
+          >
             <Feather name="plus-square" size={22} color="#111" />
           </Pressable>
 

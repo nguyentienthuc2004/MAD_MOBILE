@@ -52,6 +52,10 @@ type PostRoomResponse = ApiEnvelope<{
     room: RoomChatDto;
 }>;
 
+type CreateGroupResponse = ApiEnvelope<{
+    group: RoomChatDto;
+}>;
+
 type GetMessagesResponse = ApiEnvelope<{
     messages: MessageDto[];
 }>;
@@ -71,6 +75,13 @@ export const chatService = {
         return apiAuthRequest<PostRoomResponse>("/chat/rooms", {
             method: "POST",
             body: { receiverId },
+        });
+    },
+
+    createGroup(title: string, usersId: string[], avatar?: string) {
+        return apiAuthRequest<CreateGroupResponse>("/chat/groups", {
+            method: "POST",
+            body: { title, avatar, usersId },
         });
     },
 
