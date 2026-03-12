@@ -1,10 +1,9 @@
 import axios, {
-    AxiosError,
-    AxiosHeaders,
-    type AxiosInstance,
-    type InternalAxiosRequestConfig,
-    type RawAxiosRequestHeaders,
-
+  AxiosError,
+  AxiosHeaders,
+  type AxiosInstance,
+  type InternalAxiosRequestConfig,
+  type RawAxiosRequestHeaders,
 } from "axios";
 import { Platform } from "react-native";
 
@@ -63,7 +62,7 @@ export const configureApiAuth = (config: ApiAuthConfig) => {
 
 const DEFAULT_API_URL = Platform.select({
   android: "http://10.0.2.2:3000/api",
-  default: "http://localhost:3000/api",
+  default: process.env.EXPO_PUBLIC_API_BASE_URL ?? "http://localhost:3000/api",
 });
 
 const configuredApiUrl =
@@ -257,4 +256,3 @@ export const apiAuthRequest = <T>(
   path: string,
   options: ApiRequestOptions = {},
 ) => requestWithClient<T>(authClient, path, options);
-

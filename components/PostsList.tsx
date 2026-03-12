@@ -6,10 +6,18 @@ type PostsListProps = {
   posts: Post[];
   listHeaderComponent?: ReactElement;
   onPressMessage?: (post: Post) => void;
+  onPressComment?: (post: Post) => void;
 };
 
-export default function PostsList({ posts, listHeaderComponent, onPressMessage }: PostsListProps) {
-  const [activePostId, setActivePostId] = useState<string | null>(posts[0]?.id ?? null);
+export default function PostsList({
+  posts,
+  listHeaderComponent,
+  onPressMessage,
+  onPressComment: onPressCommentProp,
+}: PostsListProps) {
+  const [activePostId, setActivePostId] = useState<string | null>(
+    posts[0]?.id ?? null,
+  );
   const [isFeedMuted, setIsFeedMuted] = useState(true);
 
   const viewabilityConfigRef = useRef({
@@ -18,9 +26,11 @@ export default function PostsList({ posts, listHeaderComponent, onPressMessage }
 
   const onViewableItemsChanged = useRef(
     ({ viewableItems }: { viewableItems: Array<ViewToken<Post>> }) => {
-      const firstVisiblePost = viewableItems.find((item) => item.isViewable)?.item;
+      const firstVisiblePost = viewableItems.find(
+        (item) => item.isViewable,
+      )?.item;
       setActivePostId(firstVisiblePost?.id ?? null);
-    }
+    },
   );
 
   return (
@@ -38,7 +48,12 @@ export default function PostsList({ posts, listHeaderComponent, onPressMessage }
           isActive={item.id === activePostId}
           isFeedMuted={isFeedMuted}
           onToggleFeedMuted={() => setIsFeedMuted((prev) => !prev)}
-          onPressMessage={onPressMessage ? () => onPressMessage(item) : undefined}
+          onPressMessage={
+            onPressMessage ? () => onPressMessage(item) : undefined
+          }
+          onPressComment={
+            onPressCommentProp ? () => onPressCommentProp(item) : undefined
+          }
         />
       )}
     />
