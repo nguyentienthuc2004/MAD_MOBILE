@@ -10,6 +10,7 @@ import { UserAvatar } from "../../components/UserAvatarItem";
 
 const defaultMusicUrl =
   "https://res.cloudinary.com/ddfrjhhro/video/upload/v1772453075/kayji_tizi-noi-nay-co-anh-em-co-anh-o-trong-oi-302568_apznck.mp3";
+const now = Date.now();
 
 const onlineUsers: UserAvatar[] = [
   {
@@ -68,6 +69,7 @@ const posts: Post[] = [
     ],
     caption: "Outfit hôm nay đơn giản nhưng vẫn nổi bật ✨",
     likes: 1234,
+    createdAt: new Date(now - 15 * 60 * 1000).toISOString(),
     musicUrl: defaultMusicUrl,
   },
   {
@@ -82,6 +84,7 @@ const posts: Post[] = [
     ],
     caption: "Street style cuối tuần cùng team.",
     likes: 856,
+    createdAt: new Date(now - 6 * 60 * 60 * 1000).toISOString(),
     musicUrl: defaultMusicUrl,
   },
   {
@@ -96,6 +99,7 @@ const posts: Post[] = [
     ],
     caption: "Mix màu trung tính cho mùa này 🤍",
     likes: 2198,
+    createdAt: new Date(now - 9 * 24 * 60 * 60 * 1000).toISOString(),
     musicUrl: defaultMusicUrl,
   },
 ];

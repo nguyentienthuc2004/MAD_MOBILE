@@ -16,7 +16,11 @@ const getAllMusics = (): Promise<ApiResponse<Music[]>> =>
   apiAuthRequest<ApiResponse<Music[]>>(`/musics`, {
     method: "GET",
 });
-
+const getMusicById = (musicId:string) : Promise<ApiResponse<Music>> =>
+  apiAuthRequest<ApiResponse<Music>>(`/musics/${musicId}`, {
+    method: "GET",
+  });
 export const musicService = {
   getAllMusics,
+  getMusicById
 };
