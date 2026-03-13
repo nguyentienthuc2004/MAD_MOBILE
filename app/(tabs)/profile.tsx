@@ -1,10 +1,11 @@
+import { Post as FeedPost } from "@/components/PostCard";
 import { useApi } from "@/hooks/useApi";
 import { useAuth } from "@/hooks/useAuth";
 import { ApiResponse } from "@/services/api";
-import {  Post, postService } from "@/services/post.service";
+import { Post as ApiPost, postService } from "@/services/post.service";
 import { Feather, Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Dimensions,
   Image,
@@ -18,13 +19,15 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 const GRID_GAP = 2;
 const GRID_ITEM_SIZE = (Dimensions.get("window").width - GRID_GAP * 2) / 3;
+const FALLBACK_POST_IMAGE = "https://placehold.co/1080x1080?text=Post";
 
 const ProfileScreen = () => {
   const router = useRouter();
   const user = useAuth((state) => state.user);
-  const {request, loading, error} = useApi<ApiResponse<Post[]>>();
-  const [posts, setPosts] = useState<Post[]>([]);
+  const { request, loading, error } = useApi<ApiResponse<ApiPost[]>>();
+  const [posts, setPosts] = useState<ApiPost[]>([]);
   const logout = useAuth((state) => state.logout);
+
   useEffect(() => {
     const userId = user?._id;
 
@@ -41,6 +44,27 @@ const ProfileScreen = () => {
     };
     void fetchPosts();
   }, [request, user?._id]);
+
+  const feedPosts = useMemo<FeedPost[]>(() => {
+    const displayName = user?.displayName || user?.username || "Bạn";
+    const avatarUrl = user?.avatarUrl || FALLBACK_POST_IMAGE;
+
+    return posts.map((post) => ({
+      id: post._id,
+      userName: displayName,
+      userAvatar: avatarUrl,
+      images: post.images?.length ? post.images : [FALLBACK_POST_IMAGE],
+      caption: post.caption ?? "",
+      likes: post.likeCount ?? 0,
+    }));
+  }, [posts, user?.avatarUrl, user?.displayName, user?.username]);
+
+  const handleOpenPost = (postId: string) => {
+    void router.push({
+      pathname: "/post-detail",
+      params: { postId },
+    });
+  };
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
@@ -97,11 +121,29 @@ const ProfileScreen = () => {
           <Ionicons name="grid-outline" size={20} color="#111" />
         </View>
 
-        <View style={styles.gridWrap}>
-          {posts.map((item,index) => (
-            <Image key={index} source={{ uri: item.images[0] }} style={styles.gridImage} />
-          ))}
-        </View>
+        {loading ? <Text style={styles.stateText}>Đang tải bài viết...</Text> : null}
+        {error ? <Text style={styles.stateText}>{error}</Text> : null}
+
+        {!loading && !error && feedPosts.length === 0 ? (
+          <Text style={styles.stateText}>Chưa có bài viết nào.</Text>
+        ) : null}
+
+        {!loading && !error && feedPosts.length > 0 ? (
+          <View style={styles.gridWrap}>
+            {feedPosts.map((item) => (
+              <Pressable
+                key={item.id}
+                onPress={() => handleOpenPost(item.id)}
+                style={styles.gridItem}
+              >
+                <Image
+                  source={{ uri: item.images[0] }}
+                  style={styles.gridImage}
+                />
+              </Pressable>
+            ))}
+          </View>
+        ) : null}
       </ScrollView>
     </SafeAreaView>
   );
@@ -205,9 +247,19 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     gap: GRID_GAP,
   },
+  gridItem: {
+    width: GRID_ITEM_SIZE,
+    height: GRID_ITEM_SIZE,
+  },
   gridImage: {
     width: GRID_ITEM_SIZE,
     height: GRID_ITEM_SIZE,
+  },
+  stateText: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    fontSize: 14,
+    color: "#6b7280",
   },
 });
 

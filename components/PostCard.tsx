@@ -22,25 +22,83 @@ export type Post = {
   images: string[];
   caption: string;
   likes: number;
+  createdAt?: string;
   musicUrl?: string;
+};
+
+const formatPostTime = (createdAt?: string) => {
+  if (!createdAt) {
+    return "";
+  }
+
+  const createdDate = new Date(createdAt);
+
+  if (Number.isNaN(createdDate.getTime())) {
+    return "";
+  }
+
+  const diffMs = Date.now() - createdDate.getTime();
+
+  if (diffMs < 60_000) {
+    return "Vừa xong";
+  }
+
+  const diffMinutes = Math.floor(diffMs / 60_000);
+
+  if (diffMinutes < 60) {
+    return `${diffMinutes} phút trước`;
+  }
+
+  const diffHours = Math.floor(diffMinutes / 60);
+
+  if (diffHours < 24) {
+    return `${diffHours} giờ trước`;
+  }
+
+  const diffDays = Math.floor(diffHours / 24);
+
+  if (diffDays < 7) {
+    return `${diffDays} ngày trước`;
+  }
+
+  return createdDate.toLocaleDateString("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+};
+
+type PostCardMenuAction = {
+  key: string;
+  label: string;
+  destructive?: boolean;
+  onPress?: () => void;
 };
 
 type PostCardProps = {
   post: Post;
   isActive?: boolean;
   isFeedMuted?: boolean;
+  isOwnPost?: boolean;
   onToggleFeedMuted?: () => void;
   onPressMessage?: () => void;
   onPressComment?: () => void;
+  onPressEditPost?: () => void;
+  onPressDeletePost?: () => void;
+  menuActions?: PostCardMenuAction[];
 };
 
 export default function PostCard({
   post,
   isActive = true,
   isFeedMuted = true,
+  isOwnPost = false,
   onToggleFeedMuted,
   onPressMessage,
   onPressComment,
+  onPressEditPost,
+  onPressDeletePost,
+  menuActions,
 }: PostCardProps) {
   const isScreenFocused = useIsFocused();
   const [isFollowing, setIsFollowing] = useState(false);
@@ -51,8 +109,34 @@ export default function PostCard({
   const soundRef = useRef<Audio.Sound | null>(null);
   const { width: screenWidth } = useWindowDimensions();
   const imageWidth = screenWidth;
+  const postTimeLabel = formatPostTime(post.createdAt);
 
-  const menuActions = ["Quan tâm", "Không quan tâm", "Chặn người dùng"];
+  const resolvedMenuActions: PostCardMenuAction[] =
+    menuActions ??
+    (isOwnPost
+      ? [
+          {
+            key: "edit-post",
+            label: "Chỉnh sửa bài viết",
+            onPress: onPressEditPost,
+          },
+          {
+            key: "delete-post",
+            label: "Xóa bài viết",
+            destructive: true,
+            onPress: onPressDeletePost,
+          },
+        ]
+      : [
+          { key: "follow-user", label: "Quan tâm" },
+          { key: "unfollow-user", label: "Không quan tâm" },
+          { key: "block-user", label: "Chặn người dùng", destructive: true },
+        ]);
+
+  const handlePressMenuAction = (action: PostCardMenuAction) => {
+    setShowMoreMenu(false);
+    action.onPress?.();
+  };
 
   const handleImageScrollEnd = (
     event: NativeSyntheticEvent<NativeScrollEvent>,
@@ -162,16 +246,18 @@ export default function PostCard({
           <Text style={styles.userName}>{post.userName}</Text>
         </View>
         <View style={styles.headerActions}>
-          <Pressable
-            onPress={() => setIsFollowing((prev) => !prev)}
-            style={styles.followButton}
-          >
-            <Text
-              style={[styles.followText, isFollowing && styles.followingText]}
+          {!isOwnPost ? (
+            <Pressable
+              onPress={() => setIsFollowing((prev) => !prev)}
+              style={styles.followButton}
             >
-              {isFollowing ? "Đang theo dõi" : "Theo dõi"}
-            </Text>
-          </Pressable>
+              <Text
+                style={[styles.followText, isFollowing && styles.followingText]}
+              >
+                {isFollowing ? "Đang theo dõi" : "Theo dõi"}
+              </Text>
+            </Pressable>
+          ) : null}
           <Pressable
             onPress={() => setShowMoreMenu(true)}
             style={styles.moreButton}
@@ -253,6 +339,7 @@ export default function PostCard({
         <Text style={styles.captionUser}>{post.userName} </Text>
         {post.caption}
       </Text>
+      {postTimeLabel ? <Text style={styles.postTimeText}>{postTimeLabel}</Text> : null}
 
       <Modal
         visible={showMoreMenu}
@@ -265,19 +352,19 @@ export default function PostCard({
           onPress={() => setShowMoreMenu(false)}
         >
           <Pressable style={styles.bottomSheet} onPress={() => {}}>
-            {menuActions.map((action) => (
+            {resolvedMenuActions.map((action) => (
               <Pressable
-                key={action}
+                key={action.key}
                 style={styles.menuItem}
-                onPress={() => setShowMoreMenu(false)}
+                onPress={() => handlePressMenuAction(action)}
               >
                 <Text
                   style={[
                     styles.menuText,
-                    action === "Báo cáo" && styles.dangerText,
+                    action.destructive && styles.dangerText,
                   ]}
                 >
-                  {action}
+                  {action.label}
                 </Text>
               </Pressable>
             ))}
@@ -405,6 +492,12 @@ const styles = StyleSheet.create({
   },
   captionUser: {
     fontWeight: "600",
+  },
+  postTimeText: {
+    paddingHorizontal: 12,
+    paddingTop: 6,
+    fontSize: 11,
+    color: "#6b7280",
   },
   modalOverlay: {
     flex: 1,
