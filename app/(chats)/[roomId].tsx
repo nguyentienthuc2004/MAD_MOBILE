@@ -98,7 +98,7 @@ export default function ChatRoomScreen() {
 
     // Lắng nghe tin nhắn realtime qua Socket.IO
     useEffect(() => {
-        if (!roomId) return;
+        if (!roomId || !meId) return;
 
         const roomKey = String(roomId);
 
@@ -124,8 +124,8 @@ export default function ChatRoomScreen() {
             });
         };
 
-        // Tham gia room và lắng nghe sự kiện
-        socket.emit("JOIN_ROOM", roomKey);
+        // Tham gia room và lắng nghe sự kiện, gửi kèm userId để backend kiểm tra
+        socket.emit("JOIN_ROOM", { roomId: roomKey, userId: meId });
         socket.on("SEVER_SEND_MESSAGE", handleIncoming);
 
         return () => {
