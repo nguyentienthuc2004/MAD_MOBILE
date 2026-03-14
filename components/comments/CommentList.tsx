@@ -1,21 +1,31 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    RefreshControl,
-    StyleSheet,
-    Text,
-    View,
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  View,
 } from "react-native";
 import type { Comment } from "../../services/comment.service";
 import commentService from "../../services/comment.service";
+import { useAuth } from "../../stores/auth.store";
 import CommentCard from "./CommentCard";
 
 type Props = {
   postId: string;
   onReplyRequested?: (c: Comment) => void;
   onCommentAdded?: (c: Comment) => void;
+  onEditRequested?: (c: Comment) => void;
+  highlightId?: string | null;
 };
 
 type ListItem = Comment & { isReply?: boolean };
@@ -25,11 +35,18 @@ const getId = (c: Partial<Comment> & { _id?: string; id?: string }) =>
 
 const normalize = (c: any) => ({ ...c, id: getId(c) });
 
-export default function CommentList({
-  postId,
-  onReplyRequested,
-  onCommentAdded,
-}: Props) {
+function CommentList(
+  {
+    postId,
+    onReplyRequested,
+    onCommentAdded,
+    onEditRequested,
+    highlightId,
+  }: Props,
+  ref: any,
+) {
+  const currentUserId = useAuth((s) => s.user?._id);
+  const flatRef = useRef<any>(null);
   const [rootComments, setRootComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -74,7 +91,7 @@ export default function CommentList({
   };
 
   const toggleReplies = async (comment: Comment) => {
-    const id = (comment as any).id ?? (comment as any)._id;
+    const id = getId(comment);
     if (!id) return;
     const isOpen = !!expanded[id];
 
@@ -83,7 +100,6 @@ export default function CommentList({
       return;
     }
 
-    // open
     if (repliesCache[id]) {
       setExpanded((s) => ({ ...s, [id]: true }));
       return;
@@ -103,18 +119,139 @@ export default function CommentList({
     }
   };
 
+  const removeComment = (commentId: string) => {
+    setRootComments((list) => list.filter((c) => c.id !== commentId));
+    setRepliesCache((s) => {
+      const copy = { ...s };
+      delete copy[commentId];
+      Object.keys(copy).forEach((k) => {
+        copy[k] = copy[k].filter((r) => r.id !== commentId);
+      });
+      return copy;
+    });
+  };
+
+  const updateComment = (updated: Comment) => {
+    setRootComments((list) =>
+      list.map((c) => (c.id === updated.id ? { ...c, ...updated } : c)),
+    );
+
+    setRepliesCache((s) => {
+      const out: Record<string, Comment[]> = {};
+      Object.keys(s).forEach((k) => {
+        out[k] = s[k].map((r) =>
+          r.id === updated.id ? { ...r, ...updated } : r,
+        );
+      });
+      return out;
+    });
+  };
+
+  useImperativeHandle(ref, () => ({
+    addComment: (c: Comment) => {
+      // treat as root when parentCommentId is null/undefined
+      if (c.parentCommentId == null) {
+        setRootComments((s) => [normalize(c), ...s]);
+        return;
+      }
+
+      const rootId = c.rootCommentId ?? c.parentCommentId;
+      if (!rootId) return;
+
+      setRepliesCache((s) => ({
+        ...s,
+        [rootId]: [...(s[rootId] ?? []), normalize(c)],
+      }));
+
+      setRootComments((list) =>
+        list.map((rc) =>
+          rc.id === rootId
+            ? { ...rc, replyCount: (rc.replyCount ?? 0) + 1 }
+            : rc,
+        ),
+      );
+    },
+    updateComment,
+    removeComment,
+    scrollToComment: (commentId: string) => {
+      if (!commentId) return;
+
+      const data: ListItem[] = [];
+      rootComments.forEach((root) => {
+        data.push(root);
+        if (expanded[root.id]) {
+          const replies = repliesCache[root.id] ?? [];
+          replies.forEach((r) => data.push({ ...r, isReply: true }));
+        }
+      });
+
+      const idx = data.findIndex(
+        (it) => (it as any).id === commentId || (it as any)._id === commentId,
+      );
+      if (idx >= 0) {
+        try {
+          flatRef.current?.scrollToIndex({
+            index: idx,
+            animated: true,
+            viewPosition: 0.5,
+          });
+        } catch {
+          // ignore out-of-range
+        }
+      }
+    },
+    openThread: async (rootId: string, scrollToId?: string) => {
+      if (!rootId) return;
+
+      // if not loaded, load replies
+      if (!repliesCache[rootId]) {
+        try {
+          setLoadingReplies((s) => ({ ...s, [rootId]: true }));
+          const res = await commentService.getReplies(postId, rootId);
+          const rawReplies = res.data?.replies ?? [];
+          const replies = rawReplies.map((r: any) => normalize(r));
+          setRepliesCache((s) => ({ ...s, [rootId]: replies }));
+        } catch (err: any) {
+          // ignore
+        } finally {
+          setLoadingReplies((s) => ({ ...s, [rootId]: false }));
+        }
+      }
+
+      setExpanded((s) => ({ ...s, [rootId]: true }));
+
+      if (scrollToId) {
+        // give FlatList time to render
+        setTimeout(() => {
+          const data = buildData();
+          const idx = data.findIndex(
+            (it) =>
+              (it as any).id === scrollToId || (it as any)._id === scrollToId,
+          );
+          if (idx >= 0) {
+            try {
+              flatRef.current?.scrollToIndex({
+                index: idx,
+                animated: true,
+                viewPosition: 0.5,
+              });
+            } catch {}
+          }
+        }, 120);
+      }
+    },
+  }));
+
   const handleCommentAdded = (newComment: Comment) => {
-    if (!newComment.rootCommentId && !newComment.parentCommentId) {
-      // root comment
+    if (newComment.parentCommentId == null) {
       setRootComments((s) => [normalize(newComment), ...s]);
     } else {
-      // reply
       const rootId = newComment.rootCommentId ?? newComment.parentCommentId;
       if (!rootId) return;
 
       setRepliesCache((s) => {
         const prev = s[rootId] ?? [];
-        return { ...s, [rootId]: [normalize(newComment), ...prev] };
+        return { ...s, [rootId]: [...prev, normalize(newComment)] };
       });
 
       setRootComments((list) =>
@@ -125,6 +262,49 @@ export default function CommentList({
     }
 
     onCommentAdded?.(newComment);
+  };
+
+  const handleLongPress = (comment: Comment) => {
+    const id = getId(comment);
+
+    const commentUserId =
+      typeof comment.userId === "string"
+        ? comment.userId
+        : ((comment.userId &&
+            ((comment.userId as any)._id ?? (comment.userId as any).id)) ??
+          undefined);
+
+    const isMine =
+      !!currentUserId && !!commentUserId && currentUserId === commentUserId;
+
+    if (isMine) {
+      Alert.alert("Chọn hành động", undefined, [
+        { text: "Chỉnh sửa", onPress: () => onEditRequested?.(comment) },
+        {
+          text: "Xóa",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await commentService.deleteComment(postId, id);
+              removeComment(id);
+            } catch (err: any) {
+              Alert.alert("Lỗi", err?.message ?? "Không xóa được bình luận");
+            }
+          },
+        },
+        { text: "Hủy", style: "cancel" },
+      ]);
+      return;
+    }
+
+    // not mine -> only reply
+    Alert.alert("Chọn hành động", undefined, [
+      {
+        text: "Trả lời",
+        onPress: () => onReplyRequested?.(comment),
+      },
+      { text: "Hủy", style: "cancel" },
+    ]);
   };
 
   const buildData = (): ListItem[] =>
@@ -147,13 +327,21 @@ export default function CommentList({
 
   return (
     <FlatList
+      ref={flatRef}
       data={buildData()}
       keyExtractor={(i) => getId(i)}
       renderItem={({ item }) => {
         if (item.isReply) {
+          const rid = (item as any).id ?? (item as any)._id;
           return (
             <View style={styles.replyItem}>
-              <CommentCard comment={item} variant="reply" />
+              <CommentCard
+                comment={item}
+                variant="reply"
+                onPressReply={() => onReplyRequested?.(item)}
+                onLongPress={() => handleLongPress(item)}
+                isHighlighted={!!highlightId && highlightId === rid}
+              />
             </View>
           );
         }
@@ -166,6 +354,8 @@ export default function CommentList({
             onPressReply={() => onReplyRequested?.(item)}
             loadingReplies={!!loadingReplies[id]}
             isExpanded={!!expanded[id]}
+            onLongPress={() => handleLongPress(item)}
+            isHighlighted={!!highlightId && highlightId === id}
           />
         );
       }}
@@ -189,3 +379,5 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
 });
+
+export default forwardRef(CommentList);
