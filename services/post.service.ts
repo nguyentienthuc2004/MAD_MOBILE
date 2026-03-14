@@ -139,11 +139,19 @@ const editPost = (postId:string, data: EditPostRequest): Promise<ApiResponse<Pos
     },
     body: buildEditPostFormData(data),
   });
+const getPostsNotByMe = (): Promise<ApiResponse<Post[]>> =>
+  apiAuthRequest<ApiResponse<Post[]>>(`/posts/getPostsNotByMe`, {
+    method: "GET",
+  });
 
+const getPostsNotMe = (): Promise<ApiResponse<Post[]>> => getPostsNotByMe();
+  
 export const postService = {
   getPostsByUserId,
   createPost,
   getPostById,
   deletePost,
-  editPost
+  editPost,
+  getPostsNotByMe,
+  getPostsNotMe,
 };

@@ -26,6 +26,16 @@ type ChatMessage = {
     createdAt: string;
 };
 
+const dedupeMessagesById = (items: ChatMessage[]): ChatMessage[] => {
+    const uniqueById = new Map<string, ChatMessage>();
+
+    items.forEach((item) => {
+        uniqueById.set(item.id, item);
+    });
+
+    return Array.from(uniqueById.values());
+};
+
 export default function ChatRoomScreen() {
     const router = useRouter();
     const { roomId, name } = useLocalSearchParams<{ roomId: string; name?: string }>();
@@ -66,7 +76,7 @@ export default function ChatRoomScreen() {
                             : "",
                     }));
 
-                setMessages(mapped);
+                setMessages(dedupeMessagesById(mapped));
             } catch {
                 // có thể hiển thị toast / alert sau
             } finally {
@@ -103,6 +113,11 @@ export default function ChatRoomScreen() {
         const roomKey = String(roomId);
 
         const handleIncoming = (m: MessageDto) => {
+            if (String(m.room_id) !== roomKey) {
+                return;
+            }
+
+            console.log("Received message via socket:", m);
             const createdAtText = m.createdAt
                 ? new Date(m.createdAt).toLocaleTimeString("vi-VN", {
                     hour: "2-digit",
@@ -120,16 +135,24 @@ export default function ChatRoomScreen() {
             setMessages((prev) => {
                 // Tránh thêm trùng tin nhắn nếu đã có
                 if (prev.some((item) => item.id === newMsg.id)) return prev;
-                return [...prev, newMsg];
+                return dedupeMessagesById([...prev, newMsg]);
             });
         };
 
-        // Tham gia room và lắng nghe sự kiện, gửi kèm userId để backend kiểm tra
-        socket.emit("JOIN_ROOM", { roomId: roomKey, userId: meId });
-        socket.on("SEVER_SEND_MESSAGE", handleIncoming);
+
+        // Tham gia room và lắng nghe sự kiện
+        if (!socket.connected) {
+            socket.connect();
+        }
+
+        socket.emit("JOIN_ROOM", {
+            roomId: roomKey,
+            userId: meId,
+        });
+        socket.on("SERVER_SEND_MESSAGE", handleIncoming);
 
         return () => {
-            socket.off("SEVER_SEND_MESSAGE", handleIncoming);
+            socket.off("SERVER_SEND_MESSAGE", handleIncoming);
         };
     }, [roomId, meId]);
 
@@ -155,7 +178,7 @@ export default function ChatRoomScreen() {
                     : "",
             };
 
-            setMessages((prev) => [...prev, newMsg]);
+            setMessages((prev) => dedupeMessagesById([...prev, newMsg]));
             setInput("");
         } finally {
             setSending(false);

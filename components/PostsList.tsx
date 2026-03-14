@@ -5,6 +5,10 @@ import PostCard, { Post } from "./PostCard";
 type PostsListProps = {
   posts: Post[];
   listHeaderComponent?: ReactElement;
+  canFollow?: boolean;
+  getIsFollowing?: (post: Post) => boolean;
+  onToggleFollow?: (post: Post, nextValue: boolean) => void;
+  onPressUser?: (post: Post) => void;
   onPressMessage?: (post: Post) => void;
   onPressComment?: (post: Post) => void;
 };
@@ -12,6 +16,10 @@ type PostsListProps = {
 export default function PostsList({
   posts,
   listHeaderComponent,
+  canFollow,
+  getIsFollowing,
+  onToggleFollow,
+  onPressUser,
   onPressMessage,
   onPressComment: onPressCommentProp,
 }: PostsListProps) {
@@ -47,6 +55,14 @@ export default function PostsList({
           post={item}
           isActive={item.id === activePostId}
           isFeedMuted={isFeedMuted}
+          canFollow={canFollow}
+          isFollowing={getIsFollowing ? getIsFollowing(item) : undefined}
+          onToggleFollow={
+            onToggleFollow
+              ? (nextValue) => onToggleFollow(item, nextValue)
+              : undefined
+          }
+          onPressUser={onPressUser ? () => onPressUser(item) : undefined}
           onToggleFeedMuted={() => setIsFeedMuted((prev) => !prev)}
           onPressMessage={
             onPressMessage ? () => onPressMessage(item) : undefined
