@@ -1,3 +1,4 @@
+
 import { apiAuthRequest, apiRequest, type ApiResponse } from "./api";
 
 export type AppUser = {
@@ -22,4 +23,4 @@ const getUserById = (userId: string): Promise<ApiResponse<AppUser>> =>
 export const userService = {
   getUsers,
   getUserById,
-};
+

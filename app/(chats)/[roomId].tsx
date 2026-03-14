@@ -139,6 +139,7 @@ export default function ChatRoomScreen() {
             });
         };
 
+
         // Tham gia room và lắng nghe sự kiện
         if (!socket.connected) {
             socket.connect();
