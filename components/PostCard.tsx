@@ -17,6 +17,7 @@ import {
 
 export type Post = {
   id: string;
+  authorId?: string;
   userName: string;
   userAvatar: string;
   images: string[];
@@ -79,8 +80,12 @@ type PostCardProps = {
   post: Post;
   isActive?: boolean;
   isFeedMuted?: boolean;
+  canFollow?: boolean;
+  isFollowing?: boolean;
   isOwnPost?: boolean;
   onToggleFeedMuted?: () => void;
+  onToggleFollow?: (nextValue: boolean) => void;
+  onPressUser?: () => void;
   onPressMessage?: () => void;
   onPressComment?: () => void;
   onPressEditPost?: () => void;
@@ -92,8 +97,12 @@ export default function PostCard({
   post,
   isActive = true,
   isFeedMuted = true,
+  canFollow = true,
+  isFollowing: controlledIsFollowing,
   isOwnPost = false,
   onToggleFeedMuted,
+  onToggleFollow,
+  onPressUser,
   onPressMessage,
   onPressComment,
   onPressEditPost,
@@ -101,7 +110,7 @@ export default function PostCard({
   menuActions,
 }: PostCardProps) {
   const isScreenFocused = useIsFocused();
-  const [isFollowing, setIsFollowing] = useState(false);
+  const [internalIsFollowing, setInternalIsFollowing] = useState(false);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [isMusicLoading, setIsMusicLoading] = useState(false);
   const [isPlayingMusic, setIsPlayingMusic] = useState(false);
@@ -110,6 +119,7 @@ export default function PostCard({
   const { width: screenWidth } = useWindowDimensions();
   const imageWidth = screenWidth;
   const postTimeLabel = formatPostTime(post.createdAt);
+  const isFollowing = controlledIsFollowing ?? internalIsFollowing;
 
   const resolvedMenuActions: PostCardMenuAction[] =
     menuActions ??
@@ -136,6 +146,20 @@ export default function PostCard({
   const handlePressMenuAction = (action: PostCardMenuAction) => {
     setShowMoreMenu(false);
     action.onPress?.();
+  };
+
+  const handleToggleFollow = () => {
+    if (!canFollow) {
+      return;
+    }
+
+    const nextFollowing = !isFollowing;
+
+    if (controlledIsFollowing === undefined) {
+      setInternalIsFollowing(nextFollowing);
+    }
+
+    onToggleFollow?.(nextFollowing);
   };
 
   const handleImageScrollEnd = (
@@ -241,15 +265,20 @@ export default function PostCard({
   return (
     <View style={styles.card}>
       <View style={styles.postHeader}>
-        <View style={styles.userWrap}>
+        <Pressable
+          style={styles.userWrap}
+          onPress={onPressUser}
+          disabled={!onPressUser}
+        >
           <Image source={{ uri: post.userAvatar }} style={styles.userAvatar} />
           <Text style={styles.userName}>{post.userName}</Text>
-        </View>
+        </Pressable>
         <View style={styles.headerActions}>
           {!isOwnPost ? (
             <Pressable
-              onPress={() => setIsFollowing((prev) => !prev)}
-              style={styles.followButton}
+              onPress={handleToggleFollow}
+              disabled={!canFollow}
+              style={[styles.followButton, !canFollow && styles.followButtonDisabled]}
             >
               <Text
                 style={[styles.followText, isFollowing && styles.followingText]}
@@ -416,6 +445,9 @@ const styles = StyleSheet.create({
   followButton: {
     paddingHorizontal: 8,
     paddingVertical: 4,
+  },
+  followButtonDisabled: {
+    opacity: 0.55,
   },
   followText: {
     fontSize: 13,
