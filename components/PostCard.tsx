@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useIsFocused } from "@react-navigation/native";
 import { Audio, type AVPlaybackStatus } from "expo-av";
-import { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   FlatList,
   Image,
@@ -11,9 +11,12 @@ import {
   Pressable,
   StyleSheet,
   Text,
+  TouchableOpacity,
   useWindowDimensions,
   View,
 } from "react-native";
+import likeService from "../services/like.service";
+import { useAuth } from "../stores/auth.store";
 
 export type Post = {
   id: string;
@@ -120,6 +123,33 @@ export default function PostCard({
   const imageWidth = screenWidth;
   const postTimeLabel = formatPostTime(post.createdAt);
   const isFollowing = controlledIsFollowing ?? internalIsFollowing;
+  const postId = (post as any).id ?? (post as any)._id ?? (post as any).postId;
+  const [liked, setLiked] = useState(false);
+  const [likeCount, setLikeCount] = useState(
+    (post as any).likeCount ?? (post as any).likes ?? 0,
+  );
+  const [isLiking, setIsLiking] = useState(false);
+  const accessToken = useAuth((s) => s.accessToken);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const res = await likeService.checkLikeStatus("post", postId);
+        if (!mounted) return;
+        setLiked(!!res.data?.liked);
+      } catch (err) {}
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, [postId]);
+
+  useEffect(() => {
+    const incoming = (post as any).likeCount ?? (post as any).likes ?? 0;
+    setLikeCount(incoming);
+  }, [post, (post as any).likeCount, (post as any).likes]);
 
   const resolvedMenuActions: PostCardMenuAction[] =
     menuActions ??
@@ -262,6 +292,34 @@ export default function PostCard({
     onToggleFeedMuted?.();
   };
 
+  const handleLikePost = async () => {
+    const id = postId;
+    if (!id || isLiking) {
+      return;
+    }
+
+    const prevLiked = liked;
+    const prevLikeCount = likeCount ?? 0;
+    const nextLiked = !prevLiked;
+
+    // Optimistic update: toggle visual state immediately
+    setLiked(nextLiked);
+    setLikeCount(Math.max(0, prevLikeCount + (nextLiked ? 1 : -1)));
+    setIsLiking(true);
+
+    try {
+      const res = await likeService.likePost(id);
+
+      setLiked(!!res.data?.liked);
+      setLikeCount(res.data?.likeCount ?? prevLikeCount);
+    } catch (err) {
+      setLiked(prevLiked);
+      setLikeCount(prevLikeCount);
+    } finally {
+      setIsLiking(false);
+    }
+  };
+
   return (
     <View style={styles.card}>
       <View style={styles.postHeader}>
@@ -278,7 +336,10 @@ export default function PostCard({
             <Pressable
               onPress={handleToggleFollow}
               disabled={!canFollow}
-              style={[styles.followButton, !canFollow && styles.followButtonDisabled]}
+              style={[
+                styles.followButton,
+                !canFollow && styles.followButtonDisabled,
+              ]}
             >
               <Text
                 style={[styles.followText, isFollowing && styles.followingText]}
@@ -345,9 +406,18 @@ export default function PostCard({
 
       <View style={styles.actionsRow}>
         <View style={styles.leftActions}>
-          <Pressable style={styles.actionButton}>
-            <Ionicons name="heart-outline" size={24} color="black" />
-          </Pressable>
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={handleLikePost}
+            disabled={isLiking}
+            activeOpacity={0.7}
+          >
+            <Ionicons
+              name={liked ? "heart" : "heart-outline"}
+              size={22}
+              color={liked ? "#E0245E" : "#111"}
+            />
+          </TouchableOpacity>
           <Pressable
             style={styles.actionButton}
             onPress={onPressComment ?? onPressMessage}
@@ -363,12 +433,16 @@ export default function PostCard({
         </Pressable>
       </View>
 
-      <Text style={styles.likesText}>{post.likes.toLocaleString()} likes</Text>
+      <Text style={styles.likesText}>
+        {(likeCount ?? 0).toLocaleString()} likes
+      </Text>
       <Text style={styles.caption} numberOfLines={2}>
         <Text style={styles.captionUser}>{post.userName} </Text>
         {post.caption}
       </Text>
-      {postTimeLabel ? <Text style={styles.postTimeText}>{postTimeLabel}</Text> : null}
+      {postTimeLabel ? (
+        <Text style={styles.postTimeText}>{postTimeLabel}</Text>
+      ) : null}
 
       <Modal
         visible={showMoreMenu}
@@ -507,7 +581,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   actionButton: {
-    padding: 2,
+    padding: 8,
   },
   likesText: {
     paddingHorizontal: 12,

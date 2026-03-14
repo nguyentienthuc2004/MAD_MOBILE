@@ -1,28 +1,32 @@
 import { Ionicons } from "@expo/vector-icons";
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Image,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Image,
+  Pressable,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import type { Comment } from "../../services/comment.service";
+import likeService from "../../services/like.service";
 
 type Props = {
   comment: Comment;
-  onPressReplies?: () => void;
+  variant?: "reply" | "root";
   onPressReply?: () => void;
-  variant?: "root" | "reply";
-  loadingReplies?: boolean;
+  onLongPress?: () => void;
+  onPressReplies?: () => void;
   isExpanded?: boolean;
+  loadingReplies?: boolean;
+  isHighlighted?: boolean;
 };
 
-const timeAgo = (iso?: string) => {
-  if (!iso) return "";
-  const diff = Date.now() - new Date(iso).getTime();
-  const s = Math.floor(diff / 1000);
+function timeAgo(datestr?: string) {
+  if (!datestr) return "";
+  const t = Date.now() - new Date(datestr).getTime();
+  const s = Math.floor(t / 1000);
   if (s < 60) return `${s}s`;
   const m = Math.floor(s / 60);
   if (m < 60) return `${m}m`;
@@ -30,25 +34,66 @@ const timeAgo = (iso?: string) => {
   if (h < 24) return `${h}h`;
   const d = Math.floor(h / 24);
   return `${d}d`;
-};
+}
 
 export default function CommentCard({
   comment,
-  onPressReplies,
+  variant,
   onPressReply,
-  variant = "root",
-  loadingReplies = false,
-  isExpanded = false,
+  onLongPress,
+  onPressReplies,
+  isExpanded,
+  loadingReplies,
+  isHighlighted,
 }: Props) {
-  const user = typeof comment.userId === "string" ? null : comment.userId;
-  const avatar = user?.avatar;
-  const username =
-    typeof comment.userId === "string"
-      ? String(comment.userId)
-      : user?.username || "User";
+  const username = (comment as any).userId?.username ?? "User";
+  const avatar = (comment as any).userId?.avatar;
+  const [liked, setLiked] = useState(false);
+  const [likeCount, setLikeCount] = useState<number | undefined>(
+    (comment as any).likeCount ?? undefined,
+  );
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const id = (comment as any).id ?? (comment as any)._id;
+        const [statusRes, countRes] = await Promise.all([
+          likeService.checkLikeStatus("comment", id),
+          likeService.getCommentLikes(id).catch(() => null),
+        ]);
+
+        if (mounted) setLiked(!!statusRes.data?.liked);
+        if (mounted && countRes?.data?.total != null) {
+          setLikeCount(countRes.data.total);
+        }
+      } catch (err) {
+        // ignore
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [comment]);
+
+  async function handleLike() {
+    const id = (comment as any).id ?? (comment as any)._id;
+    try {
+      const res = await likeService.likeComment(id);
+      setLiked(!!res.data?.liked);
+      setLikeCount(res.data?.likeCount ?? likeCount);
+    } catch (err) {
+      // ignore
+    }
+  }
 
   return (
-    <View style={styles.container}>
+    <Pressable
+      onLongPress={onLongPress}
+      style={
+        isHighlighted ? [styles.container, styles.highlight] : styles.container
+      }
+    >
       {avatar ? (
         <Image
           source={{ uri: avatar }}
@@ -71,7 +116,11 @@ export default function CommentCard({
       <View style={styles.body}>
         <View style={styles.headRow}>
           <Text
-            style={variant === "reply" ? styles.usernameReply : styles.username}
+            style={[
+              variant === "reply" ? styles.usernameReply : styles.username,
+              isHighlighted && styles.usernameHighlighted,
+            ]}
+            numberOfLines={1}
           >
             {username}
           </Text>
@@ -80,14 +129,14 @@ export default function CommentCard({
           </Text>
         </View>
 
-        <Text style={styles.content}>{comment.content}</Text>
+        <Text
+          style={[styles.content, isHighlighted && styles.contentHighlighted]}
+          numberOfLines={2}
+        >
+          {comment.content}
+        </Text>
 
         <View style={styles.actionsRow}>
-          <TouchableOpacity style={styles.actionBtn} activeOpacity={0.7}>
-            <Ionicons name="heart-outline" size={16} color="#444" />
-            <Text style={styles.actionText}>Like</Text>
-          </TouchableOpacity>
-
           <TouchableOpacity
             style={styles.actionBtn}
             onPress={onPressReply}
@@ -121,7 +170,20 @@ export default function CommentCard({
           </View>
         ) : null}
       </View>
-    </View>
+
+      <View
+        style={variant === "reply" ? styles.likeColumnReply : styles.likeColumn}
+      >
+        <TouchableOpacity onPress={handleLike} style={styles.likeBtn}>
+          <Ionicons
+            name={liked ? "heart" : "heart-outline"}
+            size={variant === "reply" ? 16 : 18}
+            color={liked ? "#ff3b30" : "#444"}
+          />
+        </TouchableOpacity>
+        <Text style={styles.likeCountText}>{(likeCount ?? 0).toString()}</Text>
+      </View>
+    </Pressable>
   );
 }
 
@@ -140,17 +202,46 @@ const styles = StyleSheet.create({
   headRow: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
+    justifyContent: "flex-start",
   },
-  username: { fontWeight: "700", color: "#111" },
+  username: { fontWeight: "700", color: "#111", flexShrink: 1 },
   usernameReply: { fontWeight: "700", color: "#111", fontSize: 13 },
-  time: { color: "#666", fontSize: 12 },
+  time: { color: "#666", fontSize: 12, marginLeft: 8 },
   timeReply: { color: "#666", fontSize: 12 },
   content: { marginTop: 6, color: "#111" },
+  contentHighlighted: { fontWeight: "600" },
+  usernameHighlighted: { fontWeight: "800" },
   actionsRow: { flexDirection: "row", marginTop: 8 },
   actionBtn: { flexDirection: "row", alignItems: "center", marginRight: 16 },
   actionText: { marginLeft: 6, color: "#444", fontSize: 13 },
+  likedText: { color: "#ff3b30" },
   viewReplies: { marginTop: 8 },
   viewRepliesContainer: { marginTop: 8 },
   viewRepliesText: { color: "#007AFF", fontSize: 13 },
+  highlight: {
+    backgroundColor: "rgba(0,122,255,0.03)",
+    borderLeftWidth: 3,
+    borderLeftColor: "#007AFF",
+    paddingLeft: 9,
+  },
+  likeColumn: {
+    width: 48,
+    alignItems: "center",
+    justifyContent: "flex-start",
+    paddingTop: 6,
+  },
+  likeColumnReply: {
+    width: 40,
+    alignItems: "center",
+    justifyContent: "flex-start",
+    paddingTop: 4,
+  },
+  likeBtn: {
+    padding: 6,
+  },
+  likeCountText: {
+    marginTop: 4,
+    fontSize: 12,
+    color: "#666",
+  },
 });

@@ -1,6 +1,5 @@
 import { useApi } from "@/hooks/useApi";
 import { useAuth } from "@/hooks/useAuth";
-import { type ApiResponse } from "@/services/api";
 import { chatService } from "@/services/chat.service";
 import { musicService } from "@/services/music.service";
 import { type Post as ApiPost, postService } from "@/services/post.service";
@@ -74,7 +73,9 @@ export default function Home() {
 
   const [apiPosts, setApiPosts] = useState<ApiPost[]>([]);
   const [users, setUsers] = useState<AppUser[]>([]);
-  const [musicUrlsById, setMusicUrlsById] = useState<Record<string, string>>({});
+  const [musicUrlsById, setMusicUrlsById] = useState<Record<string, string>>(
+    {},
+  );
   const [followingByUserId, setFollowingByUserId] = useState<
     Record<string, boolean>
   >({});
@@ -259,7 +260,9 @@ export default function Home() {
     <SafeAreaView style={styles.container} edges={["top"]}>
       <HomeHeader />
       <View style={styles.content}>
-        {loading ? <Text style={styles.stateText}>Đang tải bảng tin...</Text> : null}
+        {loading ? (
+          <Text style={styles.stateText}>Đang tải bảng tin...</Text>
+        ) : null}
         {error ? <Text style={styles.stateText}>{error}</Text> : null}
 
         <PostsList
