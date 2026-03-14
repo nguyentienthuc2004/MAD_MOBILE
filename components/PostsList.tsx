@@ -44,7 +44,9 @@ export default function PostsList({
   return (
     <FlatList
       data={posts}
-      keyExtractor={(item) => item.id}
+      keyExtractor={(item, index) =>
+        item.id ?? (item as any)._id ?? String(index)
+      }
       showsVerticalScrollIndicator={false}
       ListHeaderComponent={listHeaderComponent}
       contentContainerStyle={styles.postsContent}

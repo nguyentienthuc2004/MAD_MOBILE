@@ -28,6 +28,13 @@ export const likeService = {
       { method: "GET" },
     );
   },
+
+  getCommentLikes(commentId: string) {
+    return apiAuthRequest<ApiResponse<{ total: number; likes: any[] }>>(
+      `/comments/${commentId}/likes`,
+      { method: "GET" },
+    );
+  },
 };
 
 export default likeService;

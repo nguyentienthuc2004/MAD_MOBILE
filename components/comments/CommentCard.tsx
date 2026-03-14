@@ -1,22 +1,98 @@
 import { Ionicons } from "@expo/vector-icons";
 import React, { useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Image,
-    Pressable,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Image,
+  Pressable,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import type { Comment } from "../../services/comment.service";
 import likeService from "../../services/like.service";
 
 type Props = {
+  comment: Comment;
+  variant?: "reply" | "root";
+  onPressReply?: () => void;
+  onLongPress?: () => void;
+  onPressReplies?: () => void;
+  isExpanded?: boolean;
+  loadingReplies?: boolean;
+  isHighlighted?: boolean;
+};
+
+function timeAgo(datestr?: string) {
+  if (!datestr) return "";
+  const t = Date.now() - new Date(datestr).getTime();
+  const s = Math.floor(t / 1000);
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h`;
+  const d = Math.floor(h / 24);
+  return `${d}d`;
+}
+
+export default function CommentCard({
+  comment,
+  variant,
+  onPressReply,
+  onLongPress,
+  onPressReplies,
+  isExpanded,
+  loadingReplies,
+  isHighlighted,
+}: Props) {
+  const username = (comment as any).userId?.username ?? "User";
+  const avatar = (comment as any).userId?.avatar;
+  const [liked, setLiked] = useState(false);
+  const [likeCount, setLikeCount] = useState<number | undefined>(
+    (comment as any).likeCount ?? undefined,
+  );
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const id = (comment as any).id ?? (comment as any)._id;
+        const [statusRes, countRes] = await Promise.all([
+          likeService.checkLikeStatus("comment", id),
+          likeService.getCommentLikes(id).catch(() => null),
+        ]);
+
+        if (mounted) setLiked(!!statusRes.data?.liked);
+        if (mounted && countRes?.data?.total != null) {
+          setLikeCount(countRes.data.total);
+        }
+      } catch (err) {
+        // ignore
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [comment]);
+
+  async function handleLike() {
+    const id = (comment as any).id ?? (comment as any)._id;
+    try {
+      const res = await likeService.likeComment(id);
+      setLiked(!!res.data?.liked);
+      setLikeCount(res.data?.likeCount ?? likeCount);
+    } catch (err) {
+      // ignore
+    }
+  }
+
   return (
     <Pressable
       onLongPress={onLongPress}
-      style={isHighlighted ? [styles.container, styles.highlight] : styles.container}
+      style={
+        isHighlighted ? [styles.container, styles.highlight] : styles.container
+      }
     >
       {avatar ? (
         <Image
@@ -60,90 +136,7 @@ type Props = {
           {comment.content}
         </Text>
 
-        {onPressReplies &&
-        typeof comment.replyCount === "number" &&
-        comment.replyCount > 0 ? (
-          <View style={styles.viewRepliesContainer}>
-            {loadingReplies ? (
-              <ActivityIndicator size="small" />
-            ) : isExpanded ? (
-              <TouchableOpacity onPress={onPressReplies} activeOpacity={0.7}>
-                <Text style={styles.viewRepliesText}>Ẩn câu trả lời</Text>
-              </TouchableOpacity>
-            ) : (
-              <TouchableOpacity
-                onPress={onPressReplies}
-                style={styles.viewReplies}
-                activeOpacity={0.7}
-              >
-                <Text
-                  style={styles.viewRepliesText}
-                >{`Xem ${comment.replyCount} câu trả lời`}</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        ) : null}
-      </View>
-
-      <View style={variant === "reply" ? styles.likeColumnReply : styles.likeColumn}>
-        <TouchableOpacity
-          onPress={async () => {
-            console.log("CommentCard: like pressed", { id: (comment as any).id ?? (comment as any)._id });
-            const id = (comment as any).id ?? (comment as any)._id;
-            try {
-              const res = await likeService.likeComment(id);
-              setLiked(!!res.data?.liked);
-              setLikeCount(res.data?.likeCount ?? likeCount);
-            } catch (err) {
-              // ignore
-            }
-          }}
-          style={styles.likeBtn}
-        >
-          <Ionicons
-            name={liked ? "heart" : "heart-outline"}
-            size={variant === "reply" ? 16 : 18}
-            color={liked ? "#ff3b30" : "#444"}
-          />
-        </TouchableOpacity>
-        <Text style={styles.likeCountText}>{(likeCount ?? 0).toString()}</Text>
-      </View>
-    </Pressable>
-  );
-        <Text
-          style={[styles.content, isHighlighted && styles.contentHighlighted]}
-        >
-          {comment.content}
-        </Text>
-
         <View style={styles.actionsRow}>
-          <TouchableOpacity
-            style={styles.actionBtn}
-            activeOpacity={0.7}
-            onPress={async () => {
-              console.log("CommentCard: like pressed", {
-                id: (comment as any).id ?? (comment as any)._id,
-              });
-              const id = (comment as any).id ?? (comment as any)._id;
-              try {
-                const res = await likeService.likeComment(id);
-                setLiked(!!res.data?.liked);
-                setLikeCount(res.data?.likeCount ?? likeCount);
-              } catch (err) {
-                // ignore
-              }
-            }}
-          >
-            <Ionicons
-              name={liked ? "heart" : "heart-outline"}
-              size={16}
-              color={liked ? "#ff3b30" : "#444"}
-            />
-            <Text style={[styles.actionText, liked && styles.likedText]}>
-              Like{likeCount ? ` (${likeCount})` : ""}
-            </Text>
-          </TouchableOpacity>
-
           <TouchableOpacity
             style={styles.actionBtn}
             onPress={onPressReply}
@@ -177,6 +170,19 @@ type Props = {
           </View>
         ) : null}
       </View>
+
+      <View
+        style={variant === "reply" ? styles.likeColumnReply : styles.likeColumn}
+      >
+        <TouchableOpacity onPress={handleLike} style={styles.likeBtn}>
+          <Ionicons
+            name={liked ? "heart" : "heart-outline"}
+            size={variant === "reply" ? 16 : 18}
+            color={liked ? "#ff3b30" : "#444"}
+          />
+        </TouchableOpacity>
+        <Text style={styles.likeCountText}>{(likeCount ?? 0).toString()}</Text>
+      </View>
     </Pressable>
   );
 }
@@ -196,11 +202,11 @@ const styles = StyleSheet.create({
   headRow: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
+    justifyContent: "flex-start",
   },
-  username: { fontWeight: "700", color: "#111" },
+  username: { fontWeight: "700", color: "#111", flexShrink: 1 },
   usernameReply: { fontWeight: "700", color: "#111", fontSize: 13 },
-  time: { color: "#666", fontSize: 12 },
+  time: { color: "#666", fontSize: 12, marginLeft: 8 },
   timeReply: { color: "#666", fontSize: 12 },
   content: { marginTop: 6, color: "#111" },
   contentHighlighted: { fontWeight: "600" },

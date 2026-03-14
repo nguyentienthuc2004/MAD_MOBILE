@@ -5,6 +5,7 @@ import type { Comment } from "@/services/comment.service";
 import { Stack, useLocalSearchParams } from "expo-router";
 import React, { useRef, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function CommentsRoute() {
   const params = useLocalSearchParams();
@@ -43,7 +44,7 @@ export default function CommentsRoute() {
     <>
       <Stack.Screen options={{ title: "Bình luận" }} />
 
-      <View style={styles.full}>
+      <SafeAreaView style={styles.full} edges={["top"]}>
         <View style={styles.header}>
           <BackButton href="/(tabs)/home" />
           <Text style={styles.title}>{`Bài viết của ${username}`}</Text>
@@ -69,7 +70,7 @@ export default function CommentsRoute() {
           onCommentAdded={handleCommentAdded}
           onCommentEdited={handleCommentEdited}
         />
-      </View>
+      </SafeAreaView>
     </>
   );
 }
@@ -77,7 +78,7 @@ export default function CommentsRoute() {
 const styles = StyleSheet.create({
   full: { flex: 1, backgroundColor: "#fff" },
   header: {
-    height: 56,
+    height: 52,
     paddingHorizontal: 12,
     flexDirection: "row",
     alignItems: "center",
