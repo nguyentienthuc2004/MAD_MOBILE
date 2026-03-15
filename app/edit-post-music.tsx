@@ -14,6 +14,7 @@ import {
   NativeScrollEvent,
   NativeSyntheticEvent,
   Pressable,
+  RefreshControl,
   StyleSheet,
   Text,
   TextInput,
@@ -170,6 +171,7 @@ export default function EditPostMusicScreen() {
   const [playingMusicId, setPlayingMusicId] = useState<string | null>(null);
   const [previewErrorMessage, setPreviewErrorMessage] = useState<string | null>(null);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
 
   const selectedImageUris = useMemo(
     () => parseSelectedUris(params.selectedUris),
@@ -285,7 +287,6 @@ export default function EditPostMusicScreen() {
               }
             });
 
-            await sound.setPositionAsync(0);
             await sound.setIsMutedAsync(false);
             await sound.playAsync();
 
@@ -396,6 +397,15 @@ export default function EditPostMusicScreen() {
     void fetchMusics();
   }, [fetchMusics]);
 
+  const handleRefresh = useCallback(async () => {
+    try {
+      setRefreshing(true);
+      await fetchMusics();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [fetchMusics]);
+
   useEffect(() => {
     void Audio.setAudioModeAsync({
       playsInSilentModeIOS: true,
@@ -407,7 +417,14 @@ export default function EditPostMusicScreen() {
     return () => {
       previewRequestIdRef.current += 1;
       if (soundRef.current) {
-        void soundRef.current.unloadAsync();
+        void soundRef.current.unloadAsync().catch((errorValue) => {
+          const message =
+            errorValue instanceof Error ? errorValue.message.toLowerCase() : "";
+
+          if (!message.includes("interrupted")) {
+            console.log("EditPostMusic cleanup unload error:", errorValue);
+          }
+        });
         soundRef.current = null;
       }
     };
@@ -527,6 +544,9 @@ export default function EditPostMusicScreen() {
               ItemSeparatorComponent={() => <View style={styles.separator} />}
               contentContainerStyle={styles.musicListContent}
               showsVerticalScrollIndicator={false}
+              refreshControl={
+                <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+              }
             />
           )}
         </View>

@@ -5,11 +5,12 @@ import { ApiResponse } from "@/services/api";
 import { Post as ApiPost, postService } from "@/services/post.service";
 import { Feather, Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Dimensions,
   Image,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -26,9 +27,10 @@ const ProfileScreen = () => {
   const user = useAuth((state) => state.user);
   const { request, loading, error } = useApi<ApiResponse<ApiPost[]>>();
   const [posts, setPosts] = useState<ApiPost[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
   const logout = useAuth((state) => state.logout);
 
-  useEffect(() => {
+  const fetchPosts = useCallback(async () => {
     const userId = user?._id;
 
     if (!userId) {
@@ -36,14 +38,24 @@ const ProfileScreen = () => {
       return;
     }
 
-    const fetchPosts = async () => {
-      console.log("Fetching posts for userId:", userId);
-      const res = await request(() => postService.getPostsByUserId(userId));
-      if (!res?.data) return;
-      setPosts(res.data);
-    };
-    void fetchPosts();
+    console.log("Fetching posts for userId:", userId);
+    const res = await request(() => postService.getPostsByUserId(userId));
+    if (!res?.data) return;
+    setPosts(res.data);
   }, [request, user?._id]);
+
+  useEffect(() => {
+    void fetchPosts();
+  }, [fetchPosts]);
+
+  const handleRefresh = useCallback(async () => {
+    try {
+      setRefreshing(true);
+      await fetchPosts();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [fetchPosts]);
 
   const feedPosts = useMemo<FeedPost[]>(() => {
     const displayName = user?.displayName || user?.username || "Bạn";
@@ -72,6 +84,9 @@ const ProfileScreen = () => {
         style={styles.scrollView}
         contentContainerStyle={styles.contentContainer}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+        }
       >
         <View style={styles.headerRow}>
           <Pressable
@@ -121,7 +136,7 @@ const ProfileScreen = () => {
           <Ionicons name="grid-outline" size={20} color="#111" />
         </View>
 
-        {loading ? <Text style={styles.stateText}>Đang tải bài viết...</Text> : null}
+        {loading && !refreshing ? <Text style={styles.stateText}>Đang tải bài viết...</Text> : null}
         {error ? <Text style={styles.stateText}>{error}</Text> : null}
 
         {!loading && !error && feedPosts.length === 0 ? (

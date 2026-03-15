@@ -5,7 +5,7 @@ import { musicService } from "@/services/music.service";
 import { type Post as ApiPost, postService } from "@/services/post.service";
 import { type AppUser, userService } from "@/services/user.service";
 import { useRouter } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import HomeHeader from "../../components/HomeHeader";
@@ -76,13 +76,12 @@ export default function Home() {
   const [musicUrlsById, setMusicUrlsById] = useState<Record<string, string>>(
     {},
   );
+  const [refreshing, setRefreshing] = useState(false);
   const [followingByUserId, setFollowingByUserId] = useState<
     Record<string, boolean>
   >({});
 
-  useEffect(() => {
-    let isCancelled = false;
-
+  const fetchFeed = useCallback(async () => {
     if (!isAuthenticated) {
       setApiPosts([]);
       setUsers([]);
@@ -90,73 +89,78 @@ export default function Home() {
       return;
     }
 
-    const fetchFeed = async () => {
-      const res = await request(async () => {
-        const [postsRes, usersRes] = await Promise.all([
-          postService.getPostsNotMe(),
-          userService.getUsers(),
-        ]);
+    const res = await request(async () => {
+      const [postsRes, usersRes] = await Promise.all([
+        postService.getPostsNotMe(),
+        userService.getUsers(),
+      ]);
 
-        const posts = postsRes.data ?? [];
-        const musicIds = Array.from(
-          new Set(
-            posts
-              .map((item) => item.musicId)
-              .filter(
-                (musicId): musicId is string =>
-                  typeof musicId === "string" && musicId.length > 0,
-              ),
-          ),
+      const posts = postsRes.data ?? [];
+      const musicIds = Array.from(
+        new Set(
+          posts
+            .map((item) => item.musicId)
+            .filter(
+              (musicId): musicId is string =>
+                typeof musicId === "string" && musicId.length > 0,
+            ),
+        ),
+      );
+
+      let resolvedMusicUrlsById: Record<string, string> = {};
+
+      if (musicIds.length > 0) {
+        const resolvedMusics = await Promise.all(
+          musicIds.map(async (musicId) => {
+            try {
+              const musicRes = await musicService.getMusicById(musicId);
+              const musicUrl = musicRes?.data?.url;
+
+              return [
+                musicId,
+                typeof musicUrl === "string" && musicUrl.length > 0
+                  ? musicUrl
+                  : "",
+              ] as const;
+            } catch {
+              return [musicId, ""] as const;
+            }
+          }),
         );
 
-        let resolvedMusicUrlsById: Record<string, string> = {};
-
-        if (musicIds.length > 0) {
-          const resolvedMusics = await Promise.all(
-            musicIds.map(async (musicId) => {
-              try {
-                const musicRes = await musicService.getMusicById(musicId);
-                const musicUrl = musicRes?.data?.url;
-
-                return [
-                  musicId,
-                  typeof musicUrl === "string" && musicUrl.length > 0
-                    ? musicUrl
-                    : "",
-                ] as const;
-              } catch {
-                return [musicId, ""] as const;
-              }
-            }),
-          );
-
-          resolvedMusicUrlsById = Object.fromEntries(
-            resolvedMusics.filter(([, musicUrl]) => Boolean(musicUrl)),
-          );
-        }
-
-        return {
-          posts,
-          users: usersRes.data ?? [],
-          musicUrlsById: resolvedMusicUrlsById,
-        };
-      });
-
-      if (!res || isCancelled) {
-        return;
+        resolvedMusicUrlsById = Object.fromEntries(
+          resolvedMusics.filter(([, musicUrl]) => Boolean(musicUrl)),
+        );
       }
 
-      setApiPosts(res.posts);
-      setUsers(res.users);
-      setMusicUrlsById(res.musicUrlsById);
-    };
+      return {
+        posts,
+        users: usersRes.data ?? [],
+        musicUrlsById: resolvedMusicUrlsById,
+      };
+    });
 
-    void fetchFeed();
+    if (!res) {
+      return;
+    }
 
-    return () => {
-      isCancelled = true;
-    };
+    setApiPosts(res.posts);
+    setUsers(res.users);
+    setMusicUrlsById(res.musicUrlsById);
   }, [isAuthenticated, request]);
+
+  useEffect(() => {
+    void fetchFeed();
+  }, [fetchFeed]);
+
+  const handleRefresh = useCallback(async () => {
+    try {
+      setRefreshing(true);
+      await fetchFeed();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [fetchFeed]);
 
   const feedPosts = useMemo<Post[]>(() => {
     const usersById = new Map(users.map((item) => [item._id, item]));
@@ -260,13 +264,15 @@ export default function Home() {
     <SafeAreaView style={styles.container} edges={["top"]}>
       <HomeHeader />
       <View style={styles.content}>
-        {loading ? (
+        {loading && !refreshing ? (
           <Text style={styles.stateText}>Đang tải bảng tin...</Text>
         ) : null}
         {error ? <Text style={styles.stateText}>{error}</Text> : null}
 
         <PostsList
           posts={feedPosts}
+          refreshing={refreshing}
+          onRefresh={handleRefresh}
           canFollow={Boolean(isAuthenticated && user?._id)}
           getIsFollowing={getIsFollowing}
           onToggleFollow={handleToggleFollow}

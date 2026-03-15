@@ -11,6 +11,7 @@ import {
   FlatList,
   Image,
   Pressable,
+  RefreshControl,
   StyleSheet,
   Text,
   View,
@@ -116,6 +117,7 @@ export default function EditPostImageScreen() {
   const [isMultiSelectEnabled, setIsMultiSelectEnabled] = useState(
     initialSelectedUris.length > 1,
   );
+  const [refreshing, setRefreshing] = useState(false);
 
   const assetMap = useMemo(
     () => new Map(assets.map((item) => [item.id, item])),
@@ -307,6 +309,15 @@ export default function EditPostImageScreen() {
       },
     ]);
   }, [assets, initialSelectedUris.length, selectedImages.length]);
+
+  const handleRefresh = useCallback(async () => {
+    try {
+      setRefreshing(true);
+      await requestPermissionAndLoadAssets();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [requestPermissionAndLoadAssets]);
 
   const handleDeleteSelectedImage = useCallback((image: SelectedImage) => {
     Alert.alert("Xóa ảnh", "Bạn có chắc muốn xóa ảnh này không?", [
@@ -513,6 +524,9 @@ export default function EditPostImageScreen() {
             contentContainerStyle={styles.thumbnailContent}
             columnWrapperStyle={styles.thumbnailRow}
             showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+            }
             renderItem={({ item }) => {
               const selectedOrder = selectedOrderMap.get(item.id);
               const isSelected = typeof selectedOrder === "number";

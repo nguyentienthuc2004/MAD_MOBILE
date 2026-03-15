@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
     ActivityIndicator,
     FlatList,
@@ -8,6 +8,7 @@ import {
     KeyboardAvoidingView,
     Platform,
     Pressable,
+    RefreshControl,
     StyleSheet,
     Text,
     TextInput,
@@ -46,6 +47,7 @@ export default function ChatRoomScreen() {
     const [sending, setSending] = useState(false);
     const [input, setInput] = useState("");
     const [room, setRoom] = useState<RoomChatDto | null>(null);
+    const [refreshing, setRefreshing] = useState(false);
 
     const meId = user?._id ?? null;
 
@@ -53,12 +55,15 @@ export default function ChatRoomScreen() {
         return name || "Đoạn chat";
     }, [name]);
 
-    useEffect(() => {
-        if (!roomId) return;
+    const fetchMessages = useCallback(
+        async (options?: { silent?: boolean }) => {
+            if (!roomId) return;
 
-        const fetchMessages = async () => {
             try {
-                setLoading(true);
+                if (!options?.silent) {
+                    setLoading(true);
+                }
+
                 const res = await chatService.getMessages(String(roomId));
                 const apiMessages: MessageDto[] = res.data?.messages ?? [];
 
@@ -80,31 +85,43 @@ export default function ChatRoomScreen() {
             } catch {
                 // có thể hiển thị toast / alert sau
             } finally {
-                setLoading(false);
+                if (!options?.silent) {
+                    setLoading(false);
+                }
             }
-        };
-
-        void fetchMessages();
-    }, [roomId, meId]);
+        },
+        [meId, roomId],
+    );
 
     useEffect(() => {
+        void fetchMessages();
+    }, [fetchMessages]);
+
+    const fetchRoom = useCallback(async () => {
         if (!roomId) return;
 
-        const fetchRoom = async () => {
-            try {
-                const res = await chatService.getRooms();
-                const apiRooms: RoomChatDto[] = res.data?.rooms ?? [];
-                const found = apiRooms.find((r) => r._id === roomId);
-                if (found) {
-                    setRoom(found);
-                }
-            } catch {
-                // bỏ qua lỗi, chỉ ảnh hưởng phần UI trống
-            }
-        };
-
-        void fetchRoom();
+        try {
+            const res = await chatService.getRooms();
+            const apiRooms: RoomChatDto[] = res.data?.rooms ?? [];
+            const found = apiRooms.find((r) => r._id === roomId);
+            setRoom(found ?? null);
+        } catch {
+            // bỏ qua lỗi, chỉ ảnh hưởng phần UI trống
+        }
     }, [roomId]);
+
+    useEffect(() => {
+        void fetchRoom();
+    }, [fetchRoom]);
+
+    const handleRefresh = useCallback(async () => {
+        try {
+            setRefreshing(true);
+            await Promise.all([fetchMessages({ silent: true }), fetchRoom()]);
+        } finally {
+            setRefreshing(false);
+        }
+    }, [fetchMessages, fetchRoom]);
 
     // Lắng nghe tin nhắn realtime qua Socket.IO
     useEffect(() => {
@@ -349,6 +366,9 @@ export default function ChatRoomScreen() {
                             keyExtractor={(item) => item.id}
                             renderItem={renderItem}
                             contentContainerStyle={styles.messagesContent}
+                            refreshControl={
+                                <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+                            }
                         />
                     )}
                 </View>
