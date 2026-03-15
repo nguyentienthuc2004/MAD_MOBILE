@@ -1,10 +1,17 @@
 import { ReactElement, useRef, useState } from "react";
-import { FlatList, StyleSheet, type ViewToken } from "react-native";
+import {
+  FlatList,
+  RefreshControl,
+  StyleSheet,
+  type ViewToken,
+} from "react-native";
 import PostCard, { Post } from "./PostCard";
 
 type PostsListProps = {
   posts: Post[];
   listHeaderComponent?: ReactElement;
+  refreshing?: boolean;
+  onRefresh?: () => void | Promise<void>;
   canFollow?: boolean;
   getIsFollowing?: (post: Post) => boolean;
   onToggleFollow?: (post: Post, nextValue: boolean) => void;
@@ -16,6 +23,8 @@ type PostsListProps = {
 export default function PostsList({
   posts,
   listHeaderComponent,
+  refreshing = false,
+  onRefresh,
   canFollow,
   getIsFollowing,
   onToggleFollow,
@@ -33,7 +42,7 @@ export default function PostsList({
   });
 
   const onViewableItemsChanged = useRef(
-    ({ viewableItems }: { viewableItems: Array<ViewToken<Post>> }) => {
+    ({ viewableItems }: { viewableItems: ViewToken<Post>[] }) => {
       const firstVisiblePost = viewableItems.find(
         (item) => item.isViewable,
       )?.item;
@@ -52,6 +61,11 @@ export default function PostsList({
       contentContainerStyle={styles.postsContent}
       viewabilityConfig={viewabilityConfigRef.current}
       onViewableItemsChanged={onViewableItemsChanged.current}
+      refreshControl={
+        onRefresh ? (
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        ) : undefined
+      }
       renderItem={({ item }) => (
         <PostCard
           post={item}

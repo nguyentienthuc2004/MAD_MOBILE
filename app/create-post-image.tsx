@@ -10,6 +10,7 @@ import {
   FlatList,
   Image,
   Pressable,
+  RefreshControl,
   StyleSheet,
   Text,
   View,
@@ -30,6 +31,7 @@ export default function CreatePostImageScreen() {
   const [selectedAssetIds, setSelectedAssetIds] = useState<string[]>([]);
   const [fallbackSelectedUris, setFallbackSelectedUris] = useState<string[]>([]);
   const [isMultiSelectEnabled, setIsMultiSelectEnabled] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   const canContinue = selectedAssetIds.length > 0;
 
@@ -217,6 +219,15 @@ export default function CreatePostImageScreen() {
     setSelectedAssetIds([assets[0].id]);
   }, [assets, fallbackSelectedUris.length, selectedAssetIds.length]);
 
+  const handleRefresh = useCallback(async () => {
+    try {
+      setRefreshing(true);
+      await requestPermissionAndLoadAssets();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [requestPermissionAndLoadAssets]);
+
   const toggleMultiSelect = useCallback(() => {
     setIsMultiSelectEnabled((prev) => !prev);
   }, []);
@@ -368,6 +379,9 @@ export default function CreatePostImageScreen() {
             contentContainerStyle={styles.thumbnailContent}
             columnWrapperStyle={styles.thumbnailRow}
             showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+            }
             renderItem={({ item }) => {
               const selectedOrder = selectedOrderMap.get(item.id);
               const isSelected = typeof selectedOrder === "number";

@@ -1,18 +1,18 @@
 import { type Post as FeedPost } from "@/components/PostCard";
 import { useApi } from "@/hooks/useApi";
 import { useAuth } from "@/hooks/useAuth";
-import { type ApiResponse } from "@/services/api";
 import { chatService } from "@/services/chat.service";
 import { type Post as ApiPost, postService } from "@/services/post.service";
 import { type AppUser, userService } from "@/services/user.service";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Alert,
   Dimensions,
   Image,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -40,10 +40,9 @@ export default function UserProfileScreen() {
   const [profileUser, setProfileUser] = useState<AppUser | null>(null);
   const [posts, setPosts] = useState<ApiPost[]>([]);
   const [isFollowing, setIsFollowing] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
-    let isCancelled = false;
-
+  const fetchUserProfile = useCallback(async () => {
     if (!targetUserId) {
       setProfileUser(null);
       setPosts([]);
@@ -55,33 +54,38 @@ export default function UserProfileScreen() {
       return;
     }
 
-    const fetchUserProfile = async () => {
-      const res = await request(async () => {
-        const [userRes, postsRes] = await Promise.all([
-          userService.getUserById(targetUserId),
-          postService.getPostsByUserId(targetUserId),
-        ]);
+    const res = await request(async () => {
+      const [userRes, postsRes] = await Promise.all([
+        userService.getUserById(targetUserId),
+        postService.getPostsByUserId(targetUserId),
+      ]);
 
-        return {
-          user: userRes.data,
-          posts: postsRes.data ?? [],
-        };
-      });
+      return {
+        user: userRes.data,
+        posts: postsRes.data ?? [],
+      };
+    });
 
-      if (!res || isCancelled) {
-        return;
-      }
+    if (!res) {
+      return;
+    }
 
-      setProfileUser(res.user);
-      setPosts(res.posts);
-    };
-
-    void fetchUserProfile();
-
-    return () => {
-      isCancelled = true;
-    };
+    setProfileUser(res.user);
+    setPosts(res.posts);
   }, [me?._id, request, router, targetUserId]);
+
+  useEffect(() => {
+    void fetchUserProfile();
+  }, [fetchUserProfile]);
+
+  const handleRefresh = useCallback(async () => {
+    try {
+      setRefreshing(true);
+      await fetchUserProfile();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [fetchUserProfile]);
 
   const feedPosts = useMemo<FeedPost[]>(() => {
     const displayName =
@@ -149,6 +153,9 @@ export default function UserProfileScreen() {
         style={styles.scrollView}
         contentContainerStyle={styles.contentContainer}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+        }
       >
         <View style={styles.headerRow}>
           <Pressable style={styles.headerIconButton} onPress={() => router.back()}>
@@ -202,7 +209,7 @@ export default function UserProfileScreen() {
           <Ionicons name="grid-outline" size={20} color="#111" />
         </View>
 
-        {loading ? <Text style={styles.stateText}>Đang tải trang cá nhân...</Text> : null}
+        {loading && !refreshing ? <Text style={styles.stateText}>Đang tải trang cá nhân...</Text> : null}
         {error ? <Text style={styles.stateText}>{error}</Text> : null}
 
         {!loading && !error && feedPosts.length === 0 ? (

@@ -7,6 +7,7 @@ import {
     FlatList,
     Image,
     Pressable,
+    RefreshControl,
     StyleSheet,
     Text,
     TextInput,
@@ -51,6 +52,7 @@ export default function ChatTabScreen() {
     const [search, setSearch] = useState("");
     const router = useRouter();
     const { rooms, loading, error, refetch } = useChatRooms();
+    const [refreshing, setRefreshing] = useState(false);
 
     const filteredOnlineUsers = useMemo(() => {
         const keyword = search.trim().toLowerCase();
@@ -65,6 +67,15 @@ export default function ChatTabScreen() {
             void refetch();
         }, [refetch]),
     );
+
+    const handleRefresh = useCallback(async () => {
+        try {
+            setRefreshing(true);
+            await refetch();
+        } finally {
+            setRefreshing(false);
+        }
+    }, [refetch]);
 
     return (
         <SafeAreaView style={styles.container} edges={["top"]}>
@@ -107,6 +118,9 @@ export default function ChatTabScreen() {
                 data={rooms}
                 keyExtractor={(item) => item.id}
                 contentContainerStyle={styles.listContent}
+                refreshControl={
+                    <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+                }
                 ItemSeparatorComponent={() => <View style={styles.separator} />}
                 renderItem={({ item }) => (
                     <Pressable

@@ -30,6 +30,15 @@ export type Post = {
   musicUrl?: string;
 };
 
+const isPlaybackInterruptionError = (error: unknown) => {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  const message = error.message.toLowerCase();
+  return message.includes("seeking interrupted") || message.includes("interrupted");
+};
+
 const formatPostTime = (createdAt?: string) => {
   if (!createdAt) {
     return "";
@@ -212,7 +221,11 @@ export default function PostCard({
 
     return () => {
       if (soundRef.current) {
-        void soundRef.current.unloadAsync();
+        void soundRef.current.unloadAsync().catch((error) => {
+          if (!isPlaybackInterruptionError(error)) {
+            console.log("PostCard unload error:", error);
+          }
+        });
         soundRef.current = null;
       }
     };
@@ -220,8 +233,13 @@ export default function PostCard({
 
   useEffect(() => {
     setIsPlayingMusic(false);
+    setIsMusicLoading(false);
     if (soundRef.current) {
-      void soundRef.current.unloadAsync();
+      void soundRef.current.unloadAsync().catch((error) => {
+        if (!isPlaybackInterruptionError(error)) {
+          console.log("PostCard unload on music change error:", error);
+        }
+      });
       soundRef.current = null;
     }
   }, [post.musicUrl]);
@@ -236,44 +254,57 @@ export default function PostCard({
     let isCancelled = false;
 
     const syncPlaybackState = async () => {
-      if (isFeedMuted || !isActive || !isScreenFocused) {
-        if (soundRef.current) {
-          await soundRef.current.stopAsync();
-        }
-
-        if (!isCancelled) {
-          setIsPlayingMusic(false);
-        }
-        return;
+      if (!isCancelled) {
+        setIsMusicLoading(true);
       }
 
-      if (!soundRef.current) {
-        const { sound } = await Audio.Sound.createAsync(
-          { uri: musicUrl },
-          { shouldPlay: true, isMuted: false },
-        );
-
-        sound.setOnPlaybackStatusUpdate((status: AVPlaybackStatus) => {
-          if (!status.isLoaded || isCancelled) {
-            return;
+      try {
+        if (isFeedMuted || !isActive || !isScreenFocused) {
+          if (soundRef.current) {
+            await soundRef.current.pauseAsync();
           }
 
-          setIsPlayingMusic(status.isPlaying);
-        });
+          if (!isCancelled) {
+            setIsPlayingMusic(false);
+          }
+          return;
+        }
 
-        soundRef.current = sound;
+        if (!soundRef.current) {
+          const { sound } = await Audio.Sound.createAsync(
+            { uri: musicUrl },
+            { shouldPlay: true, isMuted: false },
+          );
+
+          sound.setOnPlaybackStatusUpdate((status: AVPlaybackStatus) => {
+            if (!status.isLoaded || isCancelled) {
+              return;
+            }
+
+            setIsPlayingMusic(status.isPlaying);
+          });
+
+          soundRef.current = sound;
+          if (!isCancelled) {
+            setIsPlayingMusic(true);
+          }
+          return;
+        }
+
+        await soundRef.current.setIsMutedAsync(false);
+        await soundRef.current.playAsync();
+
         if (!isCancelled) {
           setIsPlayingMusic(true);
         }
-        return;
-      }
-
-      await soundRef.current.setPositionAsync(0);
-      await soundRef.current.setIsMutedAsync(false);
-      await soundRef.current.playAsync();
-
-      if (!isCancelled) {
-        setIsPlayingMusic(true);
+      } catch (error) {
+        if (!isPlaybackInterruptionError(error)) {
+          console.log("PostCard playback sync error:", error);
+        }
+      } finally {
+        if (!isCancelled) {
+          setIsMusicLoading(false);
+        }
       }
     };
 
