@@ -122,9 +122,14 @@ export default function CreatePostImageScreen() {
     };
 
     const albums = await MediaLibrary.getAlbumsAsync();
-    const preferredAlbum = albums.find((album) =>
-      /download|picture|camera/i.test(album.title)
-    );
+    const preferredAlbum = albums.find((album) => {
+      const normalizedTitle = album.title
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase();
+
+      return /downloads?|tai xuong|tai ve/.test(normalizedTitle);
+    });
 
     let result = preferredAlbum
       ? await MediaLibrary.getAssetsAsync({
