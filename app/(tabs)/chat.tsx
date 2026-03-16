@@ -72,7 +72,7 @@ export default function ChatTabScreen() {
                 <Text style={styles.headerTitle}>Tin nhắn</Text>
                 <Pressable
                     style={styles.newMessageButton}
-                    onPress={() => router.push("/(chats)/search")}
+                    onPress={() => router.push("/(chats)/new-chat")}
                 >
                     <Ionicons name="create-outline" size={22} color="#0a84ff" />
                 </Pressable>

@@ -29,7 +29,13 @@ export function useChatRooms(_token?: string) {
 
             const apiRooms = res.data?.rooms ?? [];
 
-            const mapped: ChatRoom[] = apiRooms.map((room) => {
+            // Loại bỏ các phòng trùng _id để tránh cảnh báo "Encountered two children with the same key"
+            const uniqueRooms = apiRooms.filter(
+                (room, index, arr) =>
+                    index === arr.findIndex((r) => r._id === room._id),
+            );
+
+            const mapped: ChatRoom[] = uniqueRooms.map((room) => {
                 const rawLastContent = room.lastMessage?.content?.trim() || "";
                 const isLastMine = meId
                     ? room.lastMessage?.sender === meId

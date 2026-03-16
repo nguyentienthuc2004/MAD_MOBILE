@@ -52,7 +52,13 @@ export default function ChatRoomScreen() {
                 const res = await chatService.getMessages(String(roomId));
                 const apiMessages: MessageDto[] = res.data?.messages ?? [];
 
-                const mapped: ChatMessage[] = [...apiMessages]
+                // Lọc bỏ các message trùng _id để tránh key bị trùng
+                const uniqueMessages = apiMessages.filter(
+                    (msg, index, arr) =>
+                        index === arr.findIndex((m) => m._id === msg._id),
+                );
+
+                const mapped: ChatMessage[] = [...uniqueMessages]
                     .reverse()
                     .map((m) => ({
                         id: m._id,
@@ -103,6 +109,11 @@ export default function ChatRoomScreen() {
         const roomKey = String(roomId);
 
         const handleIncoming = (m: MessageDto) => {
+            console.log("[CHAT] SERVER_SEND_MESSAGE received", {
+                roomId: roomKey,
+                meId,
+                messageId: m._id,
+            });
             const createdAtText = m.createdAt
                 ? new Date(m.createdAt).toLocaleTimeString("vi-VN", {
                     hour: "2-digit",
@@ -125,11 +136,17 @@ export default function ChatRoomScreen() {
         };
 
         // Tham gia room và lắng nghe sự kiện, gửi kèm userId để backend kiểm tra
+        console.log("[CHAT] JOIN_ROOM emit", { roomId: roomKey, userId: meId });
         socket.emit("JOIN_ROOM", { roomId: roomKey, userId: meId });
-        socket.on("SEVER_SEND_MESSAGE", handleIncoming);
+        console.log("[CHAT] Register SERVER_SEND_MESSAGE listener");
+        socket.on("SERVER_SEND_MESSAGE", handleIncoming);
 
         return () => {
-            socket.off("SEVER_SEND_MESSAGE", handleIncoming);
+            console.log("[CHAT] Cleanup SERVER_SEND_MESSAGE listener", {
+                roomId: roomKey,
+                meId,
+            });
+            socket.off("SERVER_SEND_MESSAGE", handleIncoming);
         };
     }, [roomId, meId]);
 
@@ -143,19 +160,9 @@ export default function ChatRoomScreen() {
             const m = res.data?.message;
             if (!m) return;
 
-            const newMsg: ChatMessage = {
-                id: m._id,
-                content: m.content,
-                isMine: true,
-                createdAt: m.createdAt
-                    ? new Date(m.createdAt).toLocaleTimeString("vi-VN", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                    })
-                    : "",
-            };
-
-            setMessages((prev) => [...prev, newMsg]);
+            // Không thêm trực tiếp vào state ở đây để tránh trùng với message
+            // được gửi lại từ socket SEVER_SEND_MESSAGE. UI sẽ được cập nhật
+            // duy nhất bởi sự kiện socket, đảm bảo mỗi tin nhắn chỉ hiển thị một lần.
             setInput("");
         } finally {
             setSending(false);
@@ -200,7 +207,13 @@ export default function ChatRoomScreen() {
     };
 
     const otherMembers: RoomUser[] = room?.users
-        ? room.users.filter((u) => (meId ? u.user_id !== meId : true))
+        ? room.users
+            .filter((u) => (meId ? u.user_id !== meId : true))
+            // Lọc bỏ các thành viên trùng user_id để tránh key bị trùng
+            .filter(
+                (u, index, arr) =>
+                    index === arr.findIndex((x) => String(x.user_id) === String(u.user_id)),
+            )
         : [];
 
     const otherUser: RoomUser | undefined =
@@ -323,7 +336,7 @@ export default function ChatRoomScreen() {
                     ) : (
                         <FlatList
                             data={messages}
-                            keyExtractor={(item) => item.id}
+                            keyExtractor={(item, index) => `${item.id}-${index}`}
                             renderItem={renderItem}
                             contentContainerStyle={styles.messagesContent}
                         />
