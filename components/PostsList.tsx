@@ -1,10 +1,21 @@
 import { ReactElement, useRef, useState } from "react";
-import { FlatList, StyleSheet, type ViewToken } from "react-native";
+import {
+  FlatList,
+  RefreshControl,
+  StyleSheet,
+  type ViewToken,
+} from "react-native";
 import PostCard, { Post } from "./PostCard";
 
 type PostsListProps = {
   posts: Post[];
   listHeaderComponent?: ReactElement;
+  refreshing?: boolean;
+  onRefresh?: () => void | Promise<void>;
+  canFollow?: boolean;
+  getIsFollowing?: (post: Post) => boolean;
+  onToggleFollow?: (post: Post, nextValue: boolean) => void;
+  onPressUser?: (post: Post) => void;
   onPressMessage?: (post: Post) => void;
   onPressComment?: (post: Post) => void;
 };
@@ -12,6 +23,12 @@ type PostsListProps = {
 export default function PostsList({
   posts,
   listHeaderComponent,
+  refreshing = false,
+  onRefresh,
+  canFollow,
+  getIsFollowing,
+  onToggleFollow,
+  onPressUser,
   onPressMessage,
   onPressComment: onPressCommentProp,
 }: PostsListProps) {
@@ -25,7 +42,7 @@ export default function PostsList({
   });
 
   const onViewableItemsChanged = useRef(
-    ({ viewableItems }: { viewableItems: Array<ViewToken<Post>> }) => {
+    ({ viewableItems }: { viewableItems: ViewToken<Post>[] }) => {
       const firstVisiblePost = viewableItems.find(
         (item) => item.isViewable,
       )?.item;
@@ -36,17 +53,32 @@ export default function PostsList({
   return (
     <FlatList
       data={posts}
-      keyExtractor={(item) => item.id}
+      keyExtractor={(item, index) =>
+        item.id ?? (item as any)._id ?? String(index)
+      }
       showsVerticalScrollIndicator={false}
       ListHeaderComponent={listHeaderComponent}
       contentContainerStyle={styles.postsContent}
       viewabilityConfig={viewabilityConfigRef.current}
       onViewableItemsChanged={onViewableItemsChanged.current}
+      refreshControl={
+        onRefresh ? (
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        ) : undefined
+      }
       renderItem={({ item }) => (
         <PostCard
           post={item}
           isActive={item.id === activePostId}
           isFeedMuted={isFeedMuted}
+          canFollow={canFollow}
+          isFollowing={getIsFollowing ? getIsFollowing(item) : undefined}
+          onToggleFollow={
+            onToggleFollow
+              ? (nextValue) => onToggleFollow(item, nextValue)
+              : undefined
+          }
+          onPressUser={onPressUser ? () => onPressUser(item) : undefined}
           onToggleFeedMuted={() => setIsFeedMuted((prev) => !prev)}
           onPressMessage={
             onPressMessage ? () => onPressMessage(item) : undefined

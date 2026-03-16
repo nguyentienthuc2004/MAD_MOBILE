@@ -38,6 +38,8 @@ export default function RootLayout() {
     <Stack initialRouteName="(auth)" screenOptions={{ headerShown: false }}>
       <Stack.Screen name="(auth)" />
       <Stack.Screen name="(tabs)" />
+      <Stack.Screen name="(chats)" />
+      <Stack.Screen name="users/[userId]" />
       <Stack.Screen name="post-detail" />
       <Stack.Screen name="create-post-image" />
       <Stack.Screen name="create-post-music" />

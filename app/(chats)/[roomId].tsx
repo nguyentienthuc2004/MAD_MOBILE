@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
     ActivityIndicator,
     FlatList,
@@ -8,6 +8,7 @@ import {
     KeyboardAvoidingView,
     Platform,
     Pressable,
+    RefreshControl,
     StyleSheet,
     Text,
     TextInput,
@@ -26,6 +27,16 @@ type ChatMessage = {
     createdAt: string;
 };
 
+const dedupeMessagesById = (items: ChatMessage[]): ChatMessage[] => {
+    const uniqueById = new Map<string, ChatMessage>();
+
+    items.forEach((item) => {
+        uniqueById.set(item.id, item);
+    });
+
+    return Array.from(uniqueById.values());
+};
+
 export default function ChatRoomScreen() {
     const router = useRouter();
     const { roomId, name } = useLocalSearchParams<{ roomId: string; name?: string }>();
@@ -36,6 +47,7 @@ export default function ChatRoomScreen() {
     const [sending, setSending] = useState(false);
     const [input, setInput] = useState("");
     const [room, setRoom] = useState<RoomChatDto | null>(null);
+    const [refreshing, setRefreshing] = useState(false);
 
     const meId = user?._id ?? null;
 
@@ -43,12 +55,15 @@ export default function ChatRoomScreen() {
         return name || "Đoạn chat";
     }, [name]);
 
-    useEffect(() => {
-        if (!roomId) return;
+    const fetchMessages = useCallback(
+        async (options?: { silent?: boolean }) => {
+            if (!roomId) return;
 
-        const fetchMessages = async () => {
             try {
-                setLoading(true);
+                if (!options?.silent) {
+                    setLoading(true);
+                }
+
                 const res = await chatService.getMessages(String(roomId));
                 const apiMessages: MessageDto[] = res.data?.messages ?? [];
 
@@ -72,35 +87,47 @@ export default function ChatRoomScreen() {
                             : "",
                     }));
 
-                setMessages(mapped);
+                setMessages(dedupeMessagesById(mapped));
             } catch {
                 // có thể hiển thị toast / alert sau
             } finally {
-                setLoading(false);
+                if (!options?.silent) {
+                    setLoading(false);
+                }
             }
-        };
-
-        void fetchMessages();
-    }, [roomId, meId]);
+        },
+        [meId, roomId],
+    );
 
     useEffect(() => {
+        void fetchMessages();
+    }, [fetchMessages]);
+
+    const fetchRoom = useCallback(async () => {
         if (!roomId) return;
 
-        const fetchRoom = async () => {
-            try {
-                const res = await chatService.getRooms();
-                const apiRooms: RoomChatDto[] = res.data?.rooms ?? [];
-                const found = apiRooms.find((r) => r._id === roomId);
-                if (found) {
-                    setRoom(found);
-                }
-            } catch {
-                // bỏ qua lỗi, chỉ ảnh hưởng phần UI trống
-            }
-        };
-
-        void fetchRoom();
+        try {
+            const res = await chatService.getRooms();
+            const apiRooms: RoomChatDto[] = res.data?.rooms ?? [];
+            const found = apiRooms.find((r) => r._id === roomId);
+            setRoom(found ?? null);
+        } catch {
+            // bỏ qua lỗi, chỉ ảnh hưởng phần UI trống
+        }
     }, [roomId]);
+
+    useEffect(() => {
+        void fetchRoom();
+    }, [fetchRoom]);
+
+    const handleRefresh = useCallback(async () => {
+        try {
+            setRefreshing(true);
+            await Promise.all([fetchMessages({ silent: true }), fetchRoom()]);
+        } finally {
+            setRefreshing(false);
+        }
+    }, [fetchMessages, fetchRoom]);
 
     // Lắng nghe tin nhắn realtime qua Socket.IO
     useEffect(() => {
@@ -114,6 +141,7 @@ export default function ChatRoomScreen() {
                 meId,
                 messageId: m._id,
             });
+
             const createdAtText = m.createdAt
                 ? new Date(m.createdAt).toLocaleTimeString("vi-VN", {
                     hour: "2-digit",
@@ -131,9 +159,10 @@ export default function ChatRoomScreen() {
             setMessages((prev) => {
                 // Tránh thêm trùng tin nhắn nếu đã có
                 if (prev.some((item) => item.id === newMsg.id)) return prev;
-                return [...prev, newMsg];
+                return dedupeMessagesById([...prev, newMsg]);
             });
         };
+
 
         // Tham gia room và lắng nghe sự kiện, gửi kèm userId để backend kiểm tra
         console.log("[CHAT] JOIN_ROOM emit", { roomId: roomKey, userId: meId });
@@ -339,6 +368,9 @@ export default function ChatRoomScreen() {
                             keyExtractor={(item, index) => `${item.id}-${index}`}
                             renderItem={renderItem}
                             contentContainerStyle={styles.messagesContent}
+                            refreshControl={
+                                <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+                            }
                         />
                     )}
                 </View>

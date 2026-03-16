@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useIsFocused } from "@react-navigation/native";
 import { Audio, type AVPlaybackStatus } from "expo-av";
-import { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   FlatList,
   Image,
@@ -11,12 +11,16 @@ import {
   Pressable,
   StyleSheet,
   Text,
+  TouchableOpacity,
   useWindowDimensions,
   View,
 } from "react-native";
+import likeService from "../services/like.service";
+import { useAuth } from "../stores/auth.store";
 
 export type Post = {
   id: string;
+  authorId?: string;
   userName: string;
   userAvatar: string;
   images: string[];
@@ -24,6 +28,15 @@ export type Post = {
   likes: number;
   createdAt?: string;
   musicUrl?: string;
+};
+
+const isPlaybackInterruptionError = (error: unknown) => {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  const message = error.message.toLowerCase();
+  return message.includes("seeking interrupted") || message.includes("interrupted");
 };
 
 const formatPostTime = (createdAt?: string) => {
@@ -79,8 +92,12 @@ type PostCardProps = {
   post: Post;
   isActive?: boolean;
   isFeedMuted?: boolean;
+  canFollow?: boolean;
+  isFollowing?: boolean;
   isOwnPost?: boolean;
   onToggleFeedMuted?: () => void;
+  onToggleFollow?: (nextValue: boolean) => void;
+  onPressUser?: () => void;
   onPressMessage?: () => void;
   onPressComment?: () => void;
   onPressEditPost?: () => void;
@@ -92,8 +109,12 @@ export default function PostCard({
   post,
   isActive = true,
   isFeedMuted = true,
+  canFollow = true,
+  isFollowing: controlledIsFollowing,
   isOwnPost = false,
   onToggleFeedMuted,
+  onToggleFollow,
+  onPressUser,
   onPressMessage,
   onPressComment,
   onPressEditPost,
@@ -101,7 +122,7 @@ export default function PostCard({
   menuActions,
 }: PostCardProps) {
   const isScreenFocused = useIsFocused();
-  const [isFollowing, setIsFollowing] = useState(false);
+  const [internalIsFollowing, setInternalIsFollowing] = useState(false);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [isMusicLoading, setIsMusicLoading] = useState(false);
   const [isPlayingMusic, setIsPlayingMusic] = useState(false);
@@ -110,6 +131,34 @@ export default function PostCard({
   const { width: screenWidth } = useWindowDimensions();
   const imageWidth = screenWidth;
   const postTimeLabel = formatPostTime(post.createdAt);
+  const isFollowing = controlledIsFollowing ?? internalIsFollowing;
+  const postId = (post as any).id ?? (post as any)._id ?? (post as any).postId;
+  const [liked, setLiked] = useState(false);
+  const [likeCount, setLikeCount] = useState(
+    (post as any).likeCount ?? (post as any).likes ?? 0,
+  );
+  const [isLiking, setIsLiking] = useState(false);
+  const accessToken = useAuth((s) => s.accessToken);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const res = await likeService.checkLikeStatus("post", postId);
+        if (!mounted) return;
+        setLiked(!!res.data?.liked);
+      } catch (err) {}
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, [postId]);
+
+  useEffect(() => {
+    const incoming = (post as any).likeCount ?? (post as any).likes ?? 0;
+    setLikeCount(incoming);
+  }, [post, (post as any).likeCount, (post as any).likes]);
 
   const resolvedMenuActions: PostCardMenuAction[] =
     menuActions ??
@@ -138,6 +187,20 @@ export default function PostCard({
     action.onPress?.();
   };
 
+  const handleToggleFollow = () => {
+    if (!canFollow) {
+      return;
+    }
+
+    const nextFollowing = !isFollowing;
+
+    if (controlledIsFollowing === undefined) {
+      setInternalIsFollowing(nextFollowing);
+    }
+
+    onToggleFollow?.(nextFollowing);
+  };
+
   const handleImageScrollEnd = (
     event: NativeSyntheticEvent<NativeScrollEvent>,
   ) => {
@@ -158,7 +221,11 @@ export default function PostCard({
 
     return () => {
       if (soundRef.current) {
-        void soundRef.current.unloadAsync();
+        void soundRef.current.unloadAsync().catch((error) => {
+          if (!isPlaybackInterruptionError(error)) {
+            console.log("PostCard unload error:", error);
+          }
+        });
         soundRef.current = null;
       }
     };
@@ -166,8 +233,13 @@ export default function PostCard({
 
   useEffect(() => {
     setIsPlayingMusic(false);
+    setIsMusicLoading(false);
     if (soundRef.current) {
-      void soundRef.current.unloadAsync();
+      void soundRef.current.unloadAsync().catch((error) => {
+        if (!isPlaybackInterruptionError(error)) {
+          console.log("PostCard unload on music change error:", error);
+        }
+      });
       soundRef.current = null;
     }
   }, [post.musicUrl]);
@@ -182,44 +254,57 @@ export default function PostCard({
     let isCancelled = false;
 
     const syncPlaybackState = async () => {
-      if (isFeedMuted || !isActive || !isScreenFocused) {
-        if (soundRef.current) {
-          await soundRef.current.stopAsync();
-        }
-
-        if (!isCancelled) {
-          setIsPlayingMusic(false);
-        }
-        return;
+      if (!isCancelled) {
+        setIsMusicLoading(true);
       }
 
-      if (!soundRef.current) {
-        const { sound } = await Audio.Sound.createAsync(
-          { uri: musicUrl },
-          { shouldPlay: true, isMuted: false },
-        );
-
-        sound.setOnPlaybackStatusUpdate((status: AVPlaybackStatus) => {
-          if (!status.isLoaded || isCancelled) {
-            return;
+      try {
+        if (isFeedMuted || !isActive || !isScreenFocused) {
+          if (soundRef.current) {
+            await soundRef.current.pauseAsync();
           }
 
-          setIsPlayingMusic(status.isPlaying);
-        });
+          if (!isCancelled) {
+            setIsPlayingMusic(false);
+          }
+          return;
+        }
 
-        soundRef.current = sound;
+        if (!soundRef.current) {
+          const { sound } = await Audio.Sound.createAsync(
+            { uri: musicUrl },
+            { shouldPlay: true, isMuted: false },
+          );
+
+          sound.setOnPlaybackStatusUpdate((status: AVPlaybackStatus) => {
+            if (!status.isLoaded || isCancelled) {
+              return;
+            }
+
+            setIsPlayingMusic(status.isPlaying);
+          });
+
+          soundRef.current = sound;
+          if (!isCancelled) {
+            setIsPlayingMusic(true);
+          }
+          return;
+        }
+
+        await soundRef.current.setIsMutedAsync(false);
+        await soundRef.current.playAsync();
+
         if (!isCancelled) {
           setIsPlayingMusic(true);
         }
-        return;
-      }
-
-      await soundRef.current.setPositionAsync(0);
-      await soundRef.current.setIsMutedAsync(false);
-      await soundRef.current.playAsync();
-
-      if (!isCancelled) {
-        setIsPlayingMusic(true);
+      } catch (error) {
+        if (!isPlaybackInterruptionError(error)) {
+          console.log("PostCard playback sync error:", error);
+        }
+      } finally {
+        if (!isCancelled) {
+          setIsMusicLoading(false);
+        }
       }
     };
 
@@ -238,18 +323,54 @@ export default function PostCard({
     onToggleFeedMuted?.();
   };
 
+  const handleLikePost = async () => {
+    const id = postId;
+    if (!id || isLiking) {
+      return;
+    }
+
+    const prevLiked = liked;
+    const prevLikeCount = likeCount ?? 0;
+    const nextLiked = !prevLiked;
+
+    // Optimistic update: toggle visual state immediately
+    setLiked(nextLiked);
+    setLikeCount(Math.max(0, prevLikeCount + (nextLiked ? 1 : -1)));
+    setIsLiking(true);
+
+    try {
+      const res = await likeService.likePost(id);
+
+      setLiked(!!res.data?.liked);
+      setLikeCount(res.data?.likeCount ?? prevLikeCount);
+    } catch (err) {
+      setLiked(prevLiked);
+      setLikeCount(prevLikeCount);
+    } finally {
+      setIsLiking(false);
+    }
+  };
+
   return (
     <View style={styles.card}>
       <View style={styles.postHeader}>
-        <View style={styles.userWrap}>
+        <Pressable
+          style={styles.userWrap}
+          onPress={onPressUser}
+          disabled={!onPressUser}
+        >
           <Image source={{ uri: post.userAvatar }} style={styles.userAvatar} />
           <Text style={styles.userName}>{post.userName}</Text>
-        </View>
+        </Pressable>
         <View style={styles.headerActions}>
           {!isOwnPost ? (
             <Pressable
-              onPress={() => setIsFollowing((prev) => !prev)}
-              style={styles.followButton}
+              onPress={handleToggleFollow}
+              disabled={!canFollow}
+              style={[
+                styles.followButton,
+                !canFollow && styles.followButtonDisabled,
+              ]}
             >
               <Text
                 style={[styles.followText, isFollowing && styles.followingText]}
@@ -316,9 +437,18 @@ export default function PostCard({
 
       <View style={styles.actionsRow}>
         <View style={styles.leftActions}>
-          <Pressable style={styles.actionButton}>
-            <Ionicons name="heart-outline" size={24} color="black" />
-          </Pressable>
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={handleLikePost}
+            disabled={isLiking}
+            activeOpacity={0.7}
+          >
+            <Ionicons
+              name={liked ? "heart" : "heart-outline"}
+              size={22}
+              color={liked ? "#E0245E" : "#111"}
+            />
+          </TouchableOpacity>
           <Pressable
             style={styles.actionButton}
             onPress={onPressComment ?? onPressMessage}
@@ -334,12 +464,16 @@ export default function PostCard({
         </Pressable>
       </View>
 
-      <Text style={styles.likesText}>{post.likes.toLocaleString()} likes</Text>
+      <Text style={styles.likesText}>
+        {(likeCount ?? 0).toLocaleString()} likes
+      </Text>
       <Text style={styles.caption} numberOfLines={2}>
         <Text style={styles.captionUser}>{post.userName} </Text>
         {post.caption}
       </Text>
-      {postTimeLabel ? <Text style={styles.postTimeText}>{postTimeLabel}</Text> : null}
+      {postTimeLabel ? (
+        <Text style={styles.postTimeText}>{postTimeLabel}</Text>
+      ) : null}
 
       <Modal
         visible={showMoreMenu}
@@ -417,6 +551,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
   },
+  followButtonDisabled: {
+    opacity: 0.55,
+  },
   followText: {
     fontSize: 13,
     fontWeight: "600",
@@ -475,7 +612,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   actionButton: {
-    padding: 2,
+    padding: 8,
   },
   likesText: {
     paddingHorizontal: 12,

@@ -10,7 +10,7 @@ export default function CreateGroupScreen() {
     const router = useRouter();
     const [groupName, setGroupName] = useState("");
     const [keyword, setKeyword] = useState("");
-    const [users, setUsers] = useState<[]>([]);
+    const [users, setUsers] = useState<any[]>([]);
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
     // useEffect(() => {

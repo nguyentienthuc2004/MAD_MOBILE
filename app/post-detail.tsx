@@ -11,6 +11,7 @@ import {
 	Alert,
 	FlatList,
 	Pressable,
+	RefreshControl,
 	StyleSheet,
 	Text,
 	View,
@@ -30,6 +31,7 @@ export default function PostDetailScreen() {
 	const { request, loading, error } = useApi<ApiResponse<ApiPost[]>>();
 	const [posts, setPosts] = useState<ApiPost[]>([]);
 	const [musicUrlsById, setMusicUrlsById] = useState<Record<string, string>>({});
+	const [refreshing, setRefreshing] = useState(false);
 	const [activePostId, setActivePostId] = useState<string | null>(
 		selectedPostId || null,
 	);
@@ -41,7 +43,7 @@ export default function PostDetailScreen() {
 	});
 
 	const onViewableItemsChanged = useRef(
-		({ viewableItems }: { viewableItems: Array<ViewToken<FeedPostItem>> }) => {
+		({ viewableItems }: { viewableItems: ViewToken<FeedPostItem>[] }) => {
 			const firstVisiblePost = viewableItems.find(
 				(item) => item.isViewable,
 			)?.item;
@@ -49,9 +51,8 @@ export default function PostDetailScreen() {
 		},
 	);
 
-	useEffect(() => {
+	const fetchPosts = useCallback(async () => {
 		const userId = user?._id;
-		let isCancelled = false;
 
 		if (!userId) {
 			setPosts([]);
@@ -59,66 +60,67 @@ export default function PostDetailScreen() {
 			return;
 		}
 
-		const fetchPosts = async () => {
-			const res = await request(() => postService.getPostsByUserId(userId));
-			if (!res?.data || isCancelled) {
-				return;
-			}
+		const res = await request(() => postService.getPostsByUserId(userId));
+		if (!res?.data) {
+			return;
+		}
 
-			const nextPosts = res.data;
-			setPosts(nextPosts);
+		const nextPosts = res.data;
+		setPosts(nextPosts);
 
-			const musicIds = Array.from(
-				new Set(
-					nextPosts
-						.map((item) => item.musicId)
-						.filter(
-							(musicId): musicId is string =>
-								typeof musicId === "string" && musicId.length > 0,
-						),
-				),
-			);
+		const musicIds = Array.from(
+			new Set(
+				nextPosts
+					.map((item) => item.musicId)
+					.filter(
+						(musicId): musicId is string =>
+							typeof musicId === "string" && musicId.length > 0,
+					),
+			),
+		);
 
-			if (musicIds.length === 0) {
-				setMusicUrlsById({});
-				return;
-			}
+		if (musicIds.length === 0) {
+			setMusicUrlsById({});
+			return;
+		}
 
-			const resolvedMusics = await Promise.all(
-				musicIds.map(async (musicId) => {
-					try {
-						const musicRes = await musicService.getMusicById(musicId);
-						const musicUrl = musicRes?.data?.url;
+		const resolvedMusics = await Promise.all(
+			musicIds.map(async (musicId) => {
+				try {
+					const musicRes = await musicService.getMusicById(musicId);
+					const musicUrl = musicRes?.data?.url;
 
-						return [
-							musicId,
-							typeof musicUrl === "string" && musicUrl.length > 0
-								? musicUrl
-								: "",
-						] as const;
-					} catch {
-						return [musicId, ""] as const;
-					}
-				}),
-			);
+					return [
+						musicId,
+						typeof musicUrl === "string" && musicUrl.length > 0
+							? musicUrl
+							: "",
+					] as const;
+				} catch {
+					return [musicId, ""] as const;
+				}
+			}),
+		);
 
-			if (isCancelled) {
-				return;
-			}
-
-			setMusicUrlsById(
-				Object.fromEntries(
-					resolvedMusics.filter(([, musicUrl]) => Boolean(musicUrl)),
-				),
-			);
-		};
-
-		void fetchPosts();
-
-		return () => {
-			isCancelled = true;
-		};
+		setMusicUrlsById(
+			Object.fromEntries(
+				resolvedMusics.filter(([, musicUrl]) => Boolean(musicUrl)),
+			),
+		);
 	}, [request, user?._id]);
+
+	useEffect(() => {
+		void fetchPosts();
+	}, [fetchPosts]);
+
+	const handleRefresh = useCallback(async () => {
+		try {
+			setRefreshing(true);
+			await fetchPosts();
+		} finally {
+			setRefreshing(false);
+		}
+	}, [fetchPosts]);
 
 	const feedPosts = useMemo<FeedPostItem[]>(() => {
 		const meId = user?._id ?? null;
@@ -255,7 +257,7 @@ export default function PostDetailScreen() {
 				<View style={styles.headerSpacer} />
 			</View>
 
-			{loading ? <Text style={styles.stateText}>Đang tải bài viết...</Text> : null}
+			{loading && !refreshing ? <Text style={styles.stateText}>Đang tải bài viết...</Text> : null}
 			{error ? <Text style={styles.stateText}>{error}</Text> : null}
 
 			{!loading && !error && feedPosts.length === 0 ? (
@@ -269,6 +271,9 @@ export default function PostDetailScreen() {
 					keyExtractor={(item) => item.id}
 					showsVerticalScrollIndicator={false}
 					contentContainerStyle={styles.listContent}
+					refreshControl={
+						<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+					}
 					viewabilityConfig={viewabilityConfigRef.current}
 					onViewableItemsChanged={onViewableItemsChanged.current}
 					onScrollToIndexFailed={handleScrollToIndexFailed}

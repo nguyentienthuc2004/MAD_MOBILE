@@ -1,12 +1,14 @@
-import { Post as FeedPost } from "@/components/PostCard";
+import { type Post as FeedPost } from "@/components/PostCard";
 import { useApi } from "@/hooks/useApi";
 import { useAuth } from "@/hooks/useAuth";
-import { ApiResponse } from "@/services/api";
-import { Post as ApiPost, postService } from "@/services/post.service";
-import { Feather, Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { chatService } from "@/services/chat.service";
+import { type Post as ApiPost, postService } from "@/services/post.service";
+import { type AppUser, userService } from "@/services/user.service";
+import { Ionicons } from "@expo/vector-icons";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  Alert,
   Dimensions,
   Image,
   Pressable,
@@ -21,61 +23,128 @@ import { SafeAreaView } from "react-native-safe-area-context";
 const GRID_GAP = 2;
 const GRID_ITEM_SIZE = (Dimensions.get("window").width - GRID_GAP * 2) / 3;
 const FALLBACK_POST_IMAGE = "https://placehold.co/1080x1080?text=Post";
+const FALLBACK_AVATAR_URL = "https://placehold.co/200x200?text=User";
 
-const ProfileScreen = () => {
+export default function UserProfileScreen() {
   const router = useRouter();
-  const user = useAuth((state) => state.user);
-  const { request, loading, error } = useApi<ApiResponse<ApiPost[]>>();
+  const { userId } = useLocalSearchParams<{ userId?: string }>();
+  const targetUserId = typeof userId === "string" ? userId : "";
+
+  const me = useAuth((state) => state.user);
+  const isAuthenticated = useAuth((state) => state.isAuthenticated);
+
+  const { request, loading, error } = useApi<{
+    user: AppUser;
+    posts: ApiPost[];
+  }>();
+  const [profileUser, setProfileUser] = useState<AppUser | null>(null);
   const [posts, setPosts] = useState<ApiPost[]>([]);
+  const [isFollowing, setIsFollowing] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const logout = useAuth((state) => state.logout);
 
-  const fetchPosts = useCallback(async () => {
-    const userId = user?._id;
-
-    if (!userId) {
+  const fetchUserProfile = useCallback(async () => {
+    if (!targetUserId) {
+      setProfileUser(null);
       setPosts([]);
       return;
     }
 
-    console.log("Fetching posts for userId:", userId);
-    const res = await request(() => postService.getPostsByUserId(userId));
-    if (!res?.data) return;
-    setPosts(res.data);
-  }, [request, user?._id]);
+    if (targetUserId === me?._id) {
+      void router.replace("/(tabs)/profile");
+      return;
+    }
+
+    const res = await request(async () => {
+      const [userRes, postsRes] = await Promise.all([
+        userService.getUserById(targetUserId),
+        postService.getPostsByUserId(targetUserId),
+      ]);
+
+      return {
+        user: userRes.data,
+        posts: postsRes.data ?? [],
+      };
+    });
+
+    if (!res) {
+      return;
+    }
+
+    setProfileUser(res.user);
+    setPosts(res.posts);
+  }, [me?._id, request, router, targetUserId]);
 
   useEffect(() => {
-    void fetchPosts();
-  }, [fetchPosts]);
+    void fetchUserProfile();
+  }, [fetchUserProfile]);
 
   const handleRefresh = useCallback(async () => {
     try {
       setRefreshing(true);
-      await fetchPosts();
+      await fetchUserProfile();
     } finally {
       setRefreshing(false);
     }
-  }, [fetchPosts]);
+  }, [fetchUserProfile]);
 
   const feedPosts = useMemo<FeedPost[]>(() => {
-    const displayName = user?.displayName || user?.username || "Bạn";
-    const avatarUrl = user?.avatarUrl || FALLBACK_POST_IMAGE;
+    const displayName =
+      profileUser?.displayName || profileUser?.username || "Người dùng";
+    const avatarUrl = profileUser?.avatarUrl || FALLBACK_AVATAR_URL;
 
     return posts.map((post) => ({
       id: post._id,
+      authorId: post.userId,
       userName: displayName,
       userAvatar: avatarUrl,
       images: post.images?.length ? post.images : [FALLBACK_POST_IMAGE],
       caption: post.caption ?? "",
       likes: post.likeCount ?? 0,
+      createdAt: post.createdAt,
     }));
-  }, [posts, user?.avatarUrl, user?.displayName, user?.username]);
+  }, [posts, profileUser?.avatarUrl, profileUser?.displayName, profileUser?.username]);
+
+  const displayName =
+    profileUser?.displayName || profileUser?.username || "Người dùng";
+  const bio = profileUser?.bio || "";
+  const avatarUrl = profileUser?.avatarUrl || FALLBACK_AVATAR_URL;
 
   const handleOpenPost = (postId: string) => {
     void router.push({
       pathname: "/post-detail",
       params: { postId },
     });
+  };
+
+  const handleToggleFollow = () => {
+    if (!isAuthenticated || !me?._id) {
+      Alert.alert("Thông báo", "Vui lòng đăng nhập để theo dõi.");
+      return;
+    }
+
+    setIsFollowing((prev) => !prev);
+  };
+
+  const handleOpenMessage = async () => {
+    if (!targetUserId) {
+      return;
+    }
+
+    try {
+      const res = await chatService.createRoom(targetUserId);
+      const room = res.data?.room;
+
+      if (!room?._id) {
+        throw new Error("Không nhận được phòng chat");
+      }
+
+      router.push({
+        pathname: "/(chats)/[roomId]",
+        params: { roomId: room._id },
+      });
+    } catch (chatError: any) {
+      Alert.alert("Lỗi", chatError?.message || "Không mở được phòng chat");
+    }
   };
 
   return (
@@ -89,25 +158,19 @@ const ProfileScreen = () => {
         }
       >
         <View style={styles.headerRow}>
-          <Pressable
-            style={styles.headerIconButton}
-            onPress={() => router.push("/create-post-image")}
-          >
-            <Feather name="plus-square" size={22} color="#111" />
+          <Pressable style={styles.headerIconButton} onPress={() => router.back()}>
+            <Ionicons name="chevron-back" size={22} color="#111" />
           </Pressable>
 
-          <Pressable style={styles.headerIconButton} onPress={logout}>
-            <Ionicons name="menu-outline" size={24} color="#111" />
-          </Pressable>
+          <Text style={styles.headerTitle} numberOfLines={1}>
+            {displayName}
+          </Text>
+
+          <View style={styles.headerIconButton} />
         </View>
 
         <View style={styles.profileTopRow}>
-          <Image
-            source={{
-              uri: user?.avatarUrl,
-            }}
-            style={styles.avatar}
-          />
+          <Image source={{ uri: avatarUrl }} style={styles.avatar} />
 
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
@@ -115,32 +178,42 @@ const ProfileScreen = () => {
               <Text style={styles.statLabel}>posts</Text>
             </View>
             <View style={styles.statItem}>
-              <Text style={styles.statValue}>12.4k</Text>
+              <Text style={styles.statValue}>0</Text>
               <Text style={styles.statLabel}>followers</Text>
             </View>
             <View style={styles.statItem}>
-              <Text style={styles.statValue}>248</Text>
+              <Text style={styles.statValue}>0</Text>
               <Text style={styles.statLabel}>following</Text>
             </View>
           </View>
         </View>
 
         <View style={styles.bioWrap}>
-          <Text style={styles.displayName}>{user?.displayName}</Text>
-          <Text style={styles.bioText}>
-            {user?.bio}
-          </Text>
+          <Text style={styles.displayName}>{displayName}</Text>
+          {bio ? <Text style={styles.bioText}>{bio}</Text> : null}
+        </View>
+
+        <View style={styles.actionsWrap}>
+          <Pressable style={styles.actionProfileButton} onPress={handleToggleFollow}>
+            <Text style={styles.actionProfileText}>
+              {isFollowing ? "Đang theo dõi" : "Theo dõi"}
+            </Text>
+          </Pressable>
+
+          <Pressable style={styles.actionProfileButton} onPress={handleOpenMessage}>
+            <Text style={styles.actionProfileText}>Nhắn tin</Text>
+          </Pressable>
         </View>
 
         <View style={styles.postsDivider}>
           <Ionicons name="grid-outline" size={20} color="#111" />
         </View>
 
-        {loading && !refreshing ? <Text style={styles.stateText}>Đang tải bài viết...</Text> : null}
+        {loading && !refreshing ? <Text style={styles.stateText}>Đang tải trang cá nhân...</Text> : null}
         {error ? <Text style={styles.stateText}>{error}</Text> : null}
 
         {!loading && !error && feedPosts.length === 0 ? (
-          <Text style={styles.stateText}>Chưa có bài viết nào.</Text>
+          <Text style={styles.stateText}>Người dùng chưa có bài viết nào.</Text>
         ) : null}
 
         {!loading && !error && feedPosts.length > 0 ? (
@@ -151,10 +224,7 @@ const ProfileScreen = () => {
                 onPress={() => handleOpenPost(item.id)}
                 style={styles.gridItem}
               >
-                <Image
-                  source={{ uri: item.images[0] }}
-                  style={styles.gridImage}
-                />
+                <Image source={{ uri: item.images[0] }} style={styles.gridImage} />
               </Pressable>
             ))}
           </View>
@@ -162,7 +232,7 @@ const ProfileScreen = () => {
       </ScrollView>
     </SafeAreaView>
   );
-};
+}
 
 const styles = StyleSheet.create({
   container: {
@@ -180,7 +250,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
   },
   headerIconButton: {
     width: 36,
@@ -188,6 +258,14 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
+  },
+  headerTitle: {
+    flex: 1,
+    textAlign: "center",
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#111",
+    paddingHorizontal: 8,
   },
   profileTopRow: {
     flexDirection: "row",
@@ -237,16 +315,26 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     color: "#111",
   },
-  bioMeta: {
-    marginTop: 2,
-    fontSize: 13,
-    color: "#6b7280",
+  actionsWrap: {
+    flexDirection: "row",
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingTop: 12,
   },
-  bioLink: {
-    marginTop: 2,
+  actionProfileButton: {
+    flex: 1,
+    minHeight: 34,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#fafafa",
+  },
+  actionProfileText: {
     fontSize: 13,
     fontWeight: "600",
-    color: "#2563eb",
+    color: "#111",
   },
   postsDivider: {
     height: 42,
@@ -277,5 +365,3 @@ const styles = StyleSheet.create({
     color: "#6b7280",
   },
 });
-
-export default ProfileScreen;
