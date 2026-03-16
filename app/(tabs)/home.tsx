@@ -175,6 +175,7 @@ export default function Home() {
         userAvatar: author?.avatarUrl || FALLBACK_AVATAR_URL,
         images: item.images?.length ? item.images : [FALLBACK_POST_IMAGE],
         caption: item.caption ?? "",
+        hashtags: item.hashtags ?? [],
         likes: item.likeCount ?? 0,
         createdAt: item.createdAt,
         musicUrl: item.musicId ? musicUrlsById[item.musicId] : undefined,

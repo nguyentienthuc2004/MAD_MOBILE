@@ -3,7 +3,7 @@ import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import * as MediaLibrary from "expo-media-library";
 import { useRouter } from "expo-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Dimensions,
@@ -22,9 +22,71 @@ const SCREEN_WIDTH = Dimensions.get("window").width;
 const PREVIEW_SIZE = SCREEN_WIDTH;
 const THUMB_GAP = 1;
 const THUMB_SIZE = (SCREEN_WIDTH - THUMB_GAP * 3) / 4;
+const ASSET_PAGE_SIZE = 200;
+const DOWNLOAD_ALBUM_TITLE_REGEX = /downloads?|tai xuong|tai ve/i;
+const TRASH_PATH_REGEX = /(?:^|[\\/])(?:\.trashed?|\.trash(?:es)?|trash|recycle(?:\s*bin)?|thung\s*rac)(?:[\\/]|$)/i;
+const IMAGE_FILE_EXT_REGEX = /\.(avif|bmp|gif|heic|heif|jfif|jpe?g|png|webp)$/i;
+
+const normalizeAlbumTitle = (title: string) =>
+  title
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+
+const isLikelyImageAsset = (asset: MediaLibrary.Asset) => {
+  if (asset.mediaType === MediaLibrary.MediaType.photo) {
+    return true;
+  }
+
+  const source = `${asset.filename ?? ""} ${asset.uri ?? ""}`;
+  return IMAGE_FILE_EXT_REGEX.test(source);
+};
+
+const normalizeUriForCheck = (uri?: string | null) => {
+  if (!uri) {
+    return "";
+  }
+
+  try {
+    return decodeURIComponent(uri).replace(/\\/g, "/").toLowerCase();
+  } catch {
+    return uri.replace(/\\/g, "/").toLowerCase();
+  }
+};
+
+const isTrashUri = (uri?: string | null) => {
+  const normalized = normalizeUriForCheck(uri);
+  if (!normalized) {
+    return false;
+  }
+
+  return TRASH_PATH_REGEX.test(normalized);
+};
+
+const canLoadImageUri = (uri: string) =>
+  new Promise<boolean>((resolve) => {
+    try {
+      Image.getSize(
+        uri,
+        () => resolve(true),
+        () => resolve(false),
+      );
+    } catch {
+      resolve(false);
+    }
+  });
+
+const areStringArraysEqual = (left: string[], right: string[]) => {
+  if (left.length !== right.length) {
+    return false;
+  }
+
+  return left.every((value, index) => value === right[index]);
+};
 
 export default function CreatePostImageScreen() {
   const router = useRouter();
+  const loadRequestIdRef = useRef(0);
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [loadingAssets, setLoadingAssets] = useState(false);
   const [assets, setAssets] = useState<MediaLibrary.Asset[]>([]);
@@ -114,41 +176,105 @@ export default function CreatePostImageScreen() {
     }
   }, []);
 
-  const fetchRecentAssets = useCallback(async () => {
-    const baseOptions = {
-      first: 160,
-      mediaType: [MediaLibrary.MediaType.photo],
-      sortBy: [MediaLibrary.SortBy.creationTime],
-    };
+  const fetchAllPhotoAssets = useCallback(async (albumId?: string) => {
+    let hasNextPage = true;
+    let after: string | undefined;
+    const allAssets: MediaLibrary.Asset[] = [];
 
-    const albums = await MediaLibrary.getAlbumsAsync();
-    const preferredAlbum = albums.find((album) => {
-      const normalizedTitle = album.title
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .toLowerCase();
+    while (hasNextPage) {
+      const page = await MediaLibrary.getAssetsAsync({
+        first: ASSET_PAGE_SIZE,
+        mediaType: [MediaLibrary.MediaType.photo, MediaLibrary.MediaType.unknown],
+        sortBy: [MediaLibrary.SortBy.creationTime],
+        ...(albumId ? { album: albumId } : {}),
+        ...(after ? { after } : {}),
+      });
 
-      return /downloads?|tai xuong|tai ve/.test(normalizedTitle);
-    });
+      allAssets.push(...page.assets);
 
-    let result = preferredAlbum
-      ? await MediaLibrary.getAssetsAsync({
-          ...baseOptions,
-          album: preferredAlbum.id,
-        })
-      : await MediaLibrary.getAssetsAsync(baseOptions);
-
-    if (result.assets.length === 0 && preferredAlbum) {
-      result = await MediaLibrary.getAssetsAsync(baseOptions);
+      if (!page.hasNextPage || !page.endCursor || page.assets.length === 0) {
+        hasNextPage = false;
+      } else {
+        after = page.endCursor;
+      }
     }
 
-    return result.assets;
+    return Array.from(new Map(allAssets.map((item) => [item.id, item])).values())
+      .filter(isLikelyImageAsset)
+      .sort((a, b) => (b.creationTime ?? 0) - (a.creationTime ?? 0));
   }, []);
 
+  const hydrateLiveDownloadAssets = useCallback(
+    async (items: MediaLibrary.Asset[]) => {
+      const resolved = await Promise.all(
+        items.map(async (asset) => {
+          try {
+            const info = await MediaLibrary.getAssetInfoAsync(asset.id);
+            const resolvedUri = info.localUri ?? asset.uri;
+
+            if (!resolvedUri) {
+              return null;
+            }
+
+            if (isTrashUri(resolvedUri) || isTrashUri(asset.uri)) {
+              return null;
+            }
+
+            const isReadable = await canLoadImageUri(resolvedUri);
+            if (!isReadable) {
+              return null;
+            }
+
+            return {
+              ...asset,
+              uri: resolvedUri,
+            };
+          } catch {
+            return null;
+          }
+        }),
+      );
+
+      return resolved
+        .filter((item): item is MediaLibrary.Asset => Boolean(item))
+        .sort((a, b) => (b.creationTime ?? 0) - (a.creationTime ?? 0));
+    },
+    [],
+  );
+
+  const fetchRecentAssets = useCallback(async () => {
+    const albums = await MediaLibrary.getAlbumsAsync();
+    const preferredAlbums = albums.filter((album) =>
+      DOWNLOAD_ALBUM_TITLE_REGEX.test(normalizeAlbumTitle(album.title))
+    );
+
+    if (preferredAlbums.length === 0) {
+      return [];
+    }
+
+    const groupedAssets = await Promise.all(
+      preferredAlbums.map((album) => fetchAllPhotoAssets(album.id))
+    );
+
+    const mergedAssets = Array.from(
+      new Map(groupedAssets.flat().map((item) => [item.id, item])).values()
+    ).sort((a, b) => (b.creationTime ?? 0) - (a.creationTime ?? 0));
+
+    return hydrateLiveDownloadAssets(mergedAssets);
+  }, [fetchAllPhotoAssets, hydrateLiveDownloadAssets]);
+
   const requestPermissionAndLoadAssets = useCallback(async () => {
+    const requestId = loadRequestIdRef.current + 1;
+    loadRequestIdRef.current = requestId;
+
     setLoadingAssets(true);
     try {
       const permissionResponse = await MediaLibrary.requestPermissionsAsync(false, ["photo"]);
+
+      if (requestId !== loadRequestIdRef.current) {
+        return;
+      }
+
       setHasPermission(permissionResponse.granted);
 
       if (!permissionResponse.granted) {
@@ -157,12 +283,36 @@ export default function CreatePostImageScreen() {
       }
 
       const nextAssets = await fetchRecentAssets();
+
+      if (requestId !== loadRequestIdRef.current) {
+        return;
+      }
+
       setAssets(nextAssets);
+
+      const nextAssetIds = new Set(nextAssets.map((item) => item.id));
+      const nextAssetUris = new Set(nextAssets.map((item) => item.uri));
+
+      setSelectedAssetIds((prev) => {
+        const filtered = prev.filter((assetId) => nextAssetIds.has(assetId));
+        return areStringArraysEqual(prev, filtered) ? prev : filtered;
+      });
+
+      setFallbackSelectedUris((prev) => {
+        const filtered = prev.filter((uri) => nextAssetUris.has(uri));
+        return areStringArraysEqual(prev, filtered) ? prev : filtered;
+      });
     } catch (error) {
+      if (requestId !== loadRequestIdRef.current) {
+        return;
+      }
+
       console.log("Media library permission error:", error);
       setHasPermission(false);
     } finally {
-      setLoadingAssets(false);
+      if (requestId === loadRequestIdRef.current) {
+        setLoadingAssets(false);
+      }
     }
   }, [fetchRecentAssets]);
 
@@ -192,6 +342,16 @@ export default function CreatePostImageScreen() {
 
   useEffect(() => {
     void requestPermissionAndLoadAssets();
+  }, [requestPermissionAndLoadAssets]);
+
+  useEffect(() => {
+    const subscription = MediaLibrary.addListener(() => {
+      void requestPermissionAndLoadAssets();
+    });
+
+    return () => {
+      subscription.remove();
+    };
   }, [requestPermissionAndLoadAssets]);
 
   useEffect(() => {

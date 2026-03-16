@@ -25,6 +25,7 @@ export type Post = {
   userAvatar: string;
   images: string[];
   caption: string;
+  hashtags?: string[] | string;
   likes: number;
   createdAt?: string;
   musicUrl?: string;
@@ -81,6 +82,45 @@ const formatPostTime = (createdAt?: string) => {
   });
 };
 
+const formatHashtagText = (hashtags?: string[] | string) => {
+  let rawHashtags: string[] = [];
+
+  if (Array.isArray(hashtags)) {
+    rawHashtags = hashtags;
+  } else if (typeof hashtags === "string") {
+    const trimmed = hashtags.trim();
+
+    if (!trimmed) {
+      return "";
+    }
+
+    if (trimmed.startsWith("[")) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) {
+          rawHashtags = parsed.map((item) => String(item ?? ""));
+        }
+      } catch {
+        rawHashtags = [];
+      }
+    }
+
+    if (rawHashtags.length === 0) {
+      rawHashtags = trimmed.split(/[\s,]+/g);
+    }
+  }
+
+  const cleaned = rawHashtags
+    .map((item) => item.trim().replace(/^#+/, ""))
+    .filter(Boolean);
+
+  if (cleaned.length === 0) {
+    return "";
+  }
+
+  return `#${cleaned.join(" #")}`;
+};
+
 type PostCardMenuAction = {
   key: string;
   label: string;
@@ -131,6 +171,7 @@ export default function PostCard({
   const { width: screenWidth } = useWindowDimensions();
   const imageWidth = screenWidth;
   const postTimeLabel = formatPostTime(post.createdAt);
+  const postHashtagLabel = formatHashtagText(post.hashtags);
   const isFollowing = controlledIsFollowing ?? internalIsFollowing;
   const postId = (post as any).id ?? (post as any)._id ?? (post as any).postId;
   const [liked, setLiked] = useState(false);
@@ -471,6 +512,11 @@ export default function PostCard({
         <Text style={styles.captionUser}>{post.userName} </Text>
         {post.caption}
       </Text>
+      {postHashtagLabel ? (
+        <Text style={styles.hashtagText} numberOfLines={1}>
+          {postHashtagLabel}
+        </Text>
+      ) : null}
       {postTimeLabel ? (
         <Text style={styles.postTimeText}>{postTimeLabel}</Text>
       ) : null}
@@ -629,6 +675,12 @@ const styles = StyleSheet.create({
   },
   captionUser: {
     fontWeight: "600",
+  },
+  hashtagText: {
+    paddingHorizontal: 12,
+    paddingTop: 4,
+    fontSize: 12,
+    color: "#2563eb",
   },
   postTimeText: {
     paddingHorizontal: 12,
