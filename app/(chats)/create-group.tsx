@@ -5,26 +5,27 @@ import { Alert, FlatList, Pressable, StyleSheet, Text, TextInput, View } from "r
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { chatService } from "@/services/chat.service";
+import { userService, type AppUser } from "@/services/user.service";
 
 export default function CreateGroupScreen() {
     const router = useRouter();
     const [groupName, setGroupName] = useState("");
     const [keyword, setKeyword] = useState("");
-    const [users, setUsers] = useState<any[]>([]);
+    const [users, setUsers] = useState<AppUser[]>([]);
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
-    // useEffect(() => {
-    //     const fetchUsers = async () => {
-    //         try {
-    //             const res = await userService.getUsers();
-    //             setUsers(res.data ?? []);
-    //         } catch {
-    //             setUsers([]);
-    //         }
-    //     };
+    useEffect(() => {
+        const fetchUsers = async () => {
+            try {
+                const res = await userService.getUsers();
+                setUsers(res.data ?? []);
+            } catch {
+                setUsers([]);
+            }
+        };
 
-    //     void fetchUsers();
-    // }, []);
+        void fetchUsers();
+    }, []);
 
     const filteredUsers = useMemo(() => {
         const q = keyword.trim().toLowerCase();
