@@ -52,8 +52,32 @@ export default function ChatRoomScreen() {
     const meId = user?._id ?? null;
 
     const title = useMemo(() => {
-        return name || "Đoạn chat";
-    }, [name]);
+        if (!room) {
+            return name || "Đoạn chat";
+        }
+
+        if (room.typeRoom === "friend") {
+            const others = room.users
+                ? room.users.filter((u) => (meId ? u.user_id !== meId : true))
+                : [];
+            const other = others[0] ?? room.users?.[0];
+
+            return (
+                other?.nickname ||
+                // fallback: nếu có title riêng thì dùng
+                (room as any).title ||
+                name ||
+                "Đoạn chat"
+            );
+        }
+
+        // Nhóm: ưu tiên title của room, nếu không có thì dùng name param hoặc mặc định
+        if ((room as any).title) {
+            return String((room as any).title);
+        }
+
+        return name || "Nhóm chat";
+    }, [room, meId, name]);
 
     const fetchMessages = useCallback(
         async (options?: { silent?: boolean }) => {
@@ -190,7 +214,7 @@ export default function ChatRoomScreen() {
             if (!m) return;
 
             // Không thêm trực tiếp vào state ở đây để tránh trùng với message
-            // được gửi lại từ socket SEVER_SEND_MESSAGE. UI sẽ được cập nhật
+            // được gửi lại từ socket SERVER_SEND_MESSAGE. UI sẽ được cập nhật
             // duy nhất bởi sự kiện socket, đảm bảo mỗi tin nhắn chỉ hiển thị một lần.
             setInput("");
         } finally {
@@ -258,9 +282,63 @@ export default function ChatRoomScreen() {
                 <Pressable style={styles.backButton} onPress={() => router.back()}>
                     <Ionicons name="chevron-back" size={24} color="#111" />
                 </Pressable>
-                <Text style={styles.headerTitle} numberOfLines={1}>
-                    {title}
-                </Text>
+                <Pressable
+                    style={styles.headerTitleWrap}
+                    onPress={() => {
+                        if (!roomId) return;
+
+                        const params: Record<string, string> = {
+                            roomId: String(roomId),
+                            name: title,
+                        };
+
+                        if (otherUser?.user_id) {
+                            params.userId = String(otherUser.user_id);
+                        }
+
+                        router.push({
+                            pathname: "/(chats)/chat-manage",
+                            params,
+                        });
+                    }}
+                >
+                    <View style={styles.headerTitleRow}>
+                        {isGroup ? (
+                            room?.avatar ? (
+                                <Image
+                                    source={{ uri: String(room.avatar) }}
+                                    style={styles.headerAvatar}
+                                />
+                            ) : (
+                                <View style={styles.headerAvatarFallback}>
+                                    <Ionicons
+                                        name="people-outline"
+                                        size={18}
+                                        color="#6b7280"
+                                    />
+                                </View>
+                            )
+                        ) : otherUser ? (
+                            otherUser.avatar ? (
+                                <Image
+                                    source={{ uri: otherUser.avatar }}
+                                    style={styles.headerAvatar}
+                                />
+                            ) : (
+                                <View style={styles.headerAvatarFallback}>
+                                    <Text style={styles.headerAvatarInitial}>
+                                        {otherUser.nickname
+                                            .charAt(0)
+                                            .toUpperCase()}
+                                    </Text>
+                                </View>
+                            )
+                        ) : null}
+                        <Text style={styles.headerTitle} numberOfLines={1}>
+                            {title}
+                        </Text>
+                    </View>
+                </Pressable>
             </View>
 
             <KeyboardAvoidingView
@@ -352,7 +430,12 @@ export default function ChatRoomScreen() {
                                     <Pressable
                                         style={styles.profileButton}
                                         onPress={() => {
-                                            // TODO: điều hướng sang trang cá nhân khi có màn user profile
+                                            if (!otherUser?.user_id) return;
+
+                                            router.push({
+                                                pathname: "/users/[userId]",
+                                                params: { userId: String(otherUser.user_id) },
+                                            });
                                         }}
                                     >
                                         <Text style={styles.profileButtonText}>
@@ -438,10 +521,38 @@ const styles = StyleSheet.create({
         paddingVertical: 4,
         marginRight: 4,
     },
+    headerTitleWrap: {
+        flex: 1,
+    },
+    headerTitleRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 8,
+    },
     headerTitle: {
         fontSize: 17,
         fontWeight: "600",
         color: "#111",
+    },
+    headerAvatar: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        marginRight: 4,
+    },
+    headerAvatarFallback: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: "#e5e7eb",
+        alignItems: "center",
+        justifyContent: "center",
+        marginRight: 4,
+    },
+    headerAvatarInitial: {
+        fontSize: 14,
+        fontWeight: "700",
+        color: "#4b5563",
     },
     messagesContainer: {
         flex: 1,

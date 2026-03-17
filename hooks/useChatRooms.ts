@@ -58,11 +58,11 @@ export function useChatRooms(_token?: string) {
                         ? otherMembers[0]
                         : undefined;
 
-                    const fallbackName = hasTitle
-                        ? (room as any).title
-                        : other?.nickname ||
+                    // Đoạn chat 1-1: luôn ưu tiên hiển thị BIỆT DANH của người còn lại
+                    const fallbackName =
+                        other?.nickname ||
                         room.users?.map((u) => u.nickname).join(", ") ||
-                        "Phòng chat";
+                        (hasTitle ? (room as any).title : "Phòng chat");
 
                     return {
                         id: room._id,
