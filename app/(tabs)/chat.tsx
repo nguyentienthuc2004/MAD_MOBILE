@@ -141,14 +141,35 @@ export default function ChatTabScreen() {
                             <View style={styles.avatarPlaceholder} />
                         )}
                         <View style={styles.roomInfo}>
-                            <Text style={styles.roomName} numberOfLines={1}>
+                            <Text
+                                style={[
+                                    styles.roomName,
+                                    item.unreadCount > 0 && styles.roomNameUnread,
+                                ]}
+                                numberOfLines={1}
+                            >
                                 {item.name}
                             </Text>
-                            <Text style={styles.lastMessage} numberOfLines={1}>
+                            <Text
+                                style={[
+                                    styles.lastMessage,
+                                    item.unreadCount > 0 && styles.lastMessageUnread,
+                                ]}
+                                numberOfLines={1}
+                            >
                                 {item.lastMessage}
                             </Text>
                         </View>
-                        <Text style={styles.time}>{item.updatedAt}</Text>
+                        <View style={styles.rightColumn}>
+                            <Text style={styles.time}>{item.updatedAt}</Text>
+                            {item.unreadCount > 0 && (
+                                <View style={styles.unreadBadge}>
+                                    <Text style={styles.unreadText}>
+                                        {item.unreadCount > 99 ? "99+" : item.unreadCount}
+                                    </Text>
+                                </View>
+                            )}
+                        </View>
                     </Pressable>
                 )}
                 ListEmptyComponent={
@@ -247,14 +268,40 @@ const styles = StyleSheet.create({
         fontWeight: "500",
         marginBottom: 2,
     },
+    roomNameUnread: {
+        fontWeight: "700",
+    },
     lastMessage: {
         fontSize: 13,
         color: "#666",
+    },
+    lastMessageUnread: {
+        color: "#111",
+        fontWeight: "500",
     },
     time: {
         fontSize: 12,
         color: "#999",
         marginLeft: 8,
+    },
+    rightColumn: {
+        alignItems: "flex-end",
+        marginLeft: 8,
+    },
+    unreadBadge: {
+        marginTop: 4,
+        minWidth: 20,
+        paddingHorizontal: 6,
+        height: 20,
+        borderRadius: 10,
+        backgroundColor: "#0a84ff",
+        alignItems: "center",
+        justifyContent: "center",
+    },
+    unreadText: {
+        fontSize: 11,
+        fontWeight: "600",
+        color: "#fff",
     },
     emptyWrap: {
         paddingVertical: 16,
