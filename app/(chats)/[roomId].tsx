@@ -26,6 +26,16 @@ type ChatMessage = {
     isMine: boolean;
     createdAt: string;
     senderId: string;
+    kind?: "normal" | "system";
+};
+
+type NicknameChangedEvent = {
+    roomId: string;
+    changerId?: string;
+    changerName: string;
+    targetId: string;
+    targetName: string;
+    newNickname: string;
 };
 
 const dedupeMessagesById = (items: ChatMessage[]): ChatMessage[] => {
@@ -128,6 +138,7 @@ export default function ChatRoomScreen() {
                                 minute: "2-digit",
                             })
                             : "",
+                        kind: "normal",
                     }));
 
                 setMessages(dedupeMessagesById(mapped));
@@ -180,6 +191,7 @@ export default function ChatRoomScreen() {
                             minute: "2-digit",
                         })
                         : "",
+                    kind: "normal",
                 }));
 
             setMessages((prev) =>
@@ -255,6 +267,7 @@ export default function ChatRoomScreen() {
                 isMine: meId ? m.sender_id === meId : false,
                 senderId: m.sender_id,
                 createdAt: createdAtText,
+                kind: "normal",
             };
 
             setMessages((prev) => {
@@ -265,11 +278,63 @@ export default function ChatRoomScreen() {
         };
 
 
+        const handleNicknameChanged = (payload: NicknameChangedEvent) => {
+            try {
+                if (!payload || String(payload.roomId) !== roomKey) return;
+
+                const { changerId, changerName, targetId, targetName, newNickname } =
+                    payload;
+
+                const meIdStr = meId ? String(meId) : null;
+                const changerIdStr = changerId ? String(changerId) : null;
+                const targetIdStr = String(targetId);
+
+                const isMeChanger =
+                    !!meIdStr && !!changerIdStr && meIdStr === changerIdStr;
+                const isMeTarget = !!meIdStr && meIdStr === targetIdStr;
+
+                const nicknameText = newNickname || "Chưa đặt biệt danh";
+
+                let content: string;
+
+                if (isMeChanger && isMeTarget) {
+                    // Mình tự đổi biệt danh của mình
+                    content = `Bạn đã thay đổi biệt danh của bạn thành "${nicknameText}"`;
+                } else if (isMeChanger) {
+                    // Mình đổi biệt danh của người khác
+                    content = `Bạn đã thay đổi biệt danh của ${targetName} thành "${nicknameText}"`;
+                } else if (isMeTarget) {
+                    // Người khác đổi biệt danh của mình
+                    content = `${changerName} đã thay đổi biệt danh của bạn thành "${nicknameText}"`;
+                } else {
+                    // Người khác đổi biệt danh của người khác
+                    content = `${changerName} đã thay đổi biệt danh của ${targetName} thành "${nicknameText}"`;
+                }
+
+                const systemMsg: ChatMessage = {
+                    id: `system-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+                    content,
+                    isMine: false,
+                    senderId: "system",
+                    createdAt: new Date().toLocaleTimeString("vi-VN", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                    }),
+                    kind: "system",
+                };
+
+                setMessages((prev) => [...prev, systemMsg]);
+            } catch (e) {
+                console.log("[CHAT] SERVER_NICKNAME_CHANGED handle error", e);
+            }
+        };
+
         // Tham gia room và lắng nghe sự kiện, gửi kèm userId để backend kiểm tra
         console.log("[CHAT] JOIN_ROOM emit", { roomId: roomKey, userId: meId });
         socket.emit("JOIN_ROOM", { roomId: roomKey, userId: meId });
         console.log("[CHAT] Register SERVER_SEND_MESSAGE listener");
         socket.on("SERVER_SEND_MESSAGE", handleIncoming);
+        socket.on("SERVER_NICKNAME_CHANGED", handleNicknameChanged);
 
         return () => {
             console.log("[CHAT] Cleanup SERVER_SEND_MESSAGE listener", {
@@ -277,6 +342,7 @@ export default function ChatRoomScreen() {
                 meId,
             });
             socket.off("SERVER_SEND_MESSAGE", handleIncoming);
+            socket.off("SERVER_NICKNAME_CHANGED", handleNicknameChanged);
         };
     }, [roomId, meId]);
 
@@ -302,6 +368,14 @@ export default function ChatRoomScreen() {
     };
 
     const renderItem = ({ item }: { item: ChatMessage }) => {
+        if (item.kind === "system") {
+            return (
+                <View style={styles.systemMessageRow}>
+                    <Text style={styles.systemMessageText}>{item.content}</Text>
+                </View>
+            );
+        }
+
         const sender: RoomUser | undefined =
             !item.isMine && room?.users
                 ? room.users.find((u) => String(u.user_id) === String(item.senderId))
@@ -801,6 +875,16 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontWeight: "600",
         color: "#4b5563",
+    },
+    systemMessageRow: {
+        marginVertical: 4,
+        alignItems: "center",
+        justifyContent: "center",
+    },
+    systemMessageText: {
+        fontSize: 12,
+        color: "#6b7280",
+        textAlign: "center",
     },
     messageRow: {
         flexDirection: "row",
