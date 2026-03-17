@@ -232,6 +232,17 @@ export default function ChatRoomScreen() {
         void fetchRoom();
     }, [fetchRoom]);
 
+    // Đánh dấu đã xem khi mở phòng chat
+    useEffect(() => {
+        if (!roomId) return;
+
+        void chatService
+            .markMessagesSeen(String(roomId))
+            .catch(() => {
+                // có thể hiển thị toast / log lỗi nếu cần
+            });
+    }, [roomId]);
+
     const handleRefresh = useCallback(async () => {
         try {
             setRefreshing(true);

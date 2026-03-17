@@ -30,6 +30,7 @@ export type RoomChatDto = {
     participantsHash: string;
     isDeleted?: boolean;
     lastMessage?: RoomLastMessage;
+    unreadCount?: number;
     createdAt?: string;
     updatedAt?: string;
 };
@@ -66,6 +67,10 @@ type SendMessageResponse = ApiEnvelope<{
 
 type EditNicknamesResponse = ApiEnvelope<{
     room: RoomChatDto;
+}>;
+
+type SeenMessagesResponse = ApiEnvelope<{
+    modifiedCount?: number;
 }>;
 
 export const chatService = {
@@ -111,6 +116,12 @@ export const chatService = {
         return apiAuthRequest<EditNicknamesResponse>(`/chat/rooms/${roomId}/users/${userId}/nickname`, {
             method: "PATCH",
             body: { nickname },
+        });
+    },
+
+    markMessagesSeen(roomId: string) {
+        return apiAuthRequest<SeenMessagesResponse>(`/chat/${roomId}/seen`, {
+            method: "PATCH",
         });
     },
 };

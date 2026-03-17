@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 
-import { chatService } from "@/services/chat.service";
+import { chatService, type MessageDto } from "@/services/chat.service";
+import { socket } from "@/socket/socket";
 import { useAuth } from "@/stores/auth.store";
 
 export type ChatRoom = {
@@ -8,6 +9,7 @@ export type ChatRoom = {
     name: string;
     lastMessage: string;
     updatedAt: string;
+    unreadCount: number;
     avatar?: string;
 };
 
@@ -79,6 +81,9 @@ export function useChatRooms(_token?: string) {
                         avatar: hasTitle
                             ? (room as any).avatar || other?.avatar || undefined
                             : other?.avatar || (room as any).avatar || undefined,
+                        unreadCount: typeof (room as any).unreadCount === "number"
+                            ? (room as any).unreadCount
+                            : 0,
                     };
                 }
 
@@ -98,10 +103,20 @@ export function useChatRooms(_token?: string) {
                         })
                         : "",
                     avatar: (room as any).avatar || undefined,
+                    unreadCount: typeof (room as any).unreadCount === "number"
+                        ? (room as any).unreadCount
+                        : 0,
                 };
             });
 
             setRooms(mapped);
+
+            // Tham gia tất cả room qua socket để nhận SERVER_SEND_MESSAGE
+            if (meId) {
+                mapped.forEach((room) => {
+                    socket.emit("JOIN_ROOM", { roomId: room.id, userId: meId });
+                });
+            }
         } catch (err: any) {
             setError(err.message || "Có lỗi xảy ra");
         } finally {
@@ -112,6 +127,68 @@ export function useChatRooms(_token?: string) {
     useEffect(() => {
         void fetchRooms();
     }, [fetchRooms]);
+
+    // Cập nhật danh sách phòng theo thời gian thực khi có tin nhắn mới
+    useEffect(() => {
+        if (!meId) return;
+
+        const handleIncomingMessage = (m: MessageDto) => {
+            if (!m || !m.room_id) return;
+
+            const content = (m.content || "").trim();
+            if (!content) return;
+
+            const roomId = String(m.room_id);
+            const isMine = String(m.sender_id) === String(meId);
+
+            const timeText = m.createdAt
+                ? new Date(m.createdAt).toLocaleTimeString("vi-VN", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                })
+                : "";
+
+            setRooms((prev) => {
+                const exists = prev.some((r) => r.id === roomId);
+                if (!exists) return prev;
+
+                const updated = prev.map((room) => {
+                    if (room.id !== roomId) return room;
+
+                    const lastMessageText = isMine
+                        ? `Bạn: ${content}`
+                        : content;
+
+                    return {
+                        ...room,
+                        lastMessage: lastMessageText,
+                        updatedAt: timeText || room.updatedAt,
+                        // Nếu tin nhắn là của mình thì không tăng unread;
+                        // nếu của người khác thì +1 để hiển thị badge
+                        unreadCount: isMine
+                            ? room.unreadCount
+                            : room.unreadCount + 1,
+                    };
+                });
+
+                // Đưa room vừa có tin nhắn lên đầu danh sách
+                updated.sort((a, b) => {
+                    // So sánh đơn giản theo updatedAt string (HH:MM), đủ cho cùng 1 ngày
+                    if (a.id === roomId && b.id !== roomId) return -1;
+                    if (b.id === roomId && a.id !== roomId) return 1;
+                    return 0;
+                });
+
+                return updated;
+            });
+        };
+
+        socket.on("SERVER_SEND_MESSAGE", handleIncomingMessage);
+
+        return () => {
+            socket.off("SERVER_SEND_MESSAGE", handleIncomingMessage);
+        };
+    }, [meId]);
 
     return { rooms, loading, error, refetch: fetchRooms };
 }
