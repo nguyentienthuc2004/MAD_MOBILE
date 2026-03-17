@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
     ActivityIndicator,
     FlatList,
@@ -25,6 +25,7 @@ type ChatMessage = {
     content: string;
     isMine: boolean;
     createdAt: string;
+    senderId: string;
 };
 
 const dedupeMessagesById = (items: ChatMessage[]): ChatMessage[] => {
@@ -48,6 +49,12 @@ export default function ChatRoomScreen() {
     const [input, setInput] = useState("");
     const [room, setRoom] = useState<RoomChatDto | null>(null);
     const [refreshing, setRefreshing] = useState(false);
+    const [loadingMore, setLoadingMore] = useState(false);
+    const [hasMore, setHasMore] = useState(true);
+    const [oldestCursor, setOldestCursor] = useState<string | null>(null);
+
+    const flatListRef = useRef<FlatList<ChatMessage> | null>(null);
+    const shouldAutoScrollRef = useRef<boolean>(true);
 
     const meId = user?._id ?? null;
 
@@ -97,12 +104,24 @@ export default function ChatRoomScreen() {
                         index === arr.findIndex((m) => m._id === msg._id),
                 );
 
+                // Cập nhật cursor và trạng thái còn tin nhắn cũ hay không
+                if (uniqueMessages.length > 0) {
+                    const oldest = uniqueMessages[uniqueMessages.length - 1];
+                    setOldestCursor(oldest.createdAt ?? null);
+                    // Nếu lấy đủ 20 tin thì có thể còn, nếu ít hơn thì coi như hết
+                    setHasMore(uniqueMessages.length >= 20);
+                } else {
+                    setOldestCursor(null);
+                    setHasMore(false);
+                }
+
                 const mapped: ChatMessage[] = [...uniqueMessages]
                     .reverse()
                     .map((m) => ({
                         id: m._id,
                         content: m.content,
                         isMine: meId ? m.sender_id === meId : false,
+                        senderId: m.sender_id,
                         createdAt: m.createdAt
                             ? new Date(m.createdAt).toLocaleTimeString("vi-VN", {
                                 hour: "2-digit",
@@ -126,6 +145,63 @@ export default function ChatRoomScreen() {
     useEffect(() => {
         void fetchMessages();
     }, [fetchMessages]);
+
+    const loadMoreMessages = useCallback(async () => {
+        if (!roomId || loadingMore || !hasMore || !oldestCursor) return;
+
+        try {
+            setLoadingMore(true);
+
+            const res = await chatService.getMessages(String(roomId), {
+                before: oldestCursor,
+            });
+            const apiMessages: MessageDto[] = res.data?.messages ?? [];
+
+            if (apiMessages.length === 0) {
+                setHasMore(false);
+                return;
+            }
+
+            const uniqueMessages = apiMessages.filter(
+                (msg, index, arr) =>
+                    index === arr.findIndex((m) => m._id === msg._id),
+            );
+
+            const mapped: ChatMessage[] = [...uniqueMessages]
+                .reverse()
+                .map((m) => ({
+                    id: m._id,
+                    content: m.content,
+                    isMine: meId ? m.sender_id === meId : false,
+                    senderId: m.sender_id,
+                    createdAt: m.createdAt
+                        ? new Date(m.createdAt).toLocaleTimeString("vi-VN", {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                        })
+                        : "",
+                }));
+
+            setMessages((prev) =>
+                dedupeMessagesById([
+                    // prepend tin nhắn cũ hơn lên đầu danh sách
+                    ...mapped,
+                    ...prev,
+                ]),
+            );
+
+            const oldest = uniqueMessages[uniqueMessages.length - 1];
+            if (oldest?.createdAt) {
+                setOldestCursor(oldest.createdAt);
+            } else {
+                setHasMore(false);
+            }
+        } catch {
+            // có thể hiển thị toast / alert sau
+        } finally {
+            setLoadingMore(false);
+        }
+    }, [roomId, loadingMore, hasMore, oldestCursor, meId]);
 
     const fetchRoom = useCallback(async () => {
         if (!roomId) return;
@@ -177,6 +253,7 @@ export default function ChatRoomScreen() {
                 id: m._id,
                 content: m.content,
                 isMine: meId ? m.sender_id === meId : false,
+                senderId: m.sender_id,
                 createdAt: createdAtText,
             };
 
@@ -208,6 +285,8 @@ export default function ChatRoomScreen() {
         if (!text || !roomId || sending) return;
 
         try {
+            // Khi mình gửi tin nhắn thì luôn muốn cuộn xuống cuối
+            shouldAutoScrollRef.current = true;
             setSending(true);
             const res = await chatService.sendMessage(String(roomId), text);
             const m = res.data?.message;
@@ -223,6 +302,11 @@ export default function ChatRoomScreen() {
     };
 
     const renderItem = ({ item }: { item: ChatMessage }) => {
+        const sender: RoomUser | undefined =
+            !item.isMine && room?.users
+                ? room.users.find((u) => String(u.user_id) === String(item.senderId))
+                : undefined;
+
         return (
             <View
                 style={[
@@ -230,6 +314,24 @@ export default function ChatRoomScreen() {
                     item.isMine ? styles.messageRowMine : styles.messageRowOther,
                 ]}
             >
+                {!item.isMine && (
+                    <View style={styles.messageAvatarWrap}>
+                        {sender?.avatar ? (
+                            <Image
+                                source={{ uri: sender.avatar }}
+                                style={styles.messageAvatar}
+                            />
+                        ) : (
+                            <View style={styles.messageAvatarFallback}>
+                                <Text style={styles.messageAvatarInitial}>
+                                    {(sender?.nickname || "?")
+                                        .charAt(0)
+                                        .toUpperCase()}
+                                </Text>
+                            </View>
+                        )}
+                    </View>
+                )}
                 <View
                     style={[
                         styles.messageBubble,
@@ -245,14 +347,16 @@ export default function ChatRoomScreen() {
                         {item.content}
                     </Text>
                     {item.createdAt ? (
-                        <Text
-                            style={[
-                                styles.messageTime,
-                                item.isMine && styles.messageTimeMine,
-                            ]}
-                        >
-                            {item.createdAt}
-                        </Text>
+                        <View style={styles.messageTimeRow}>
+                            <Text
+                                style={[
+                                    styles.messageTime,
+                                    item.isMine && styles.messageTimeMine,
+                                ]}
+                            >
+                                {item.createdAt}
+                            </Text>
+                        </View>
                     ) : null}
                 </View>
             </View>
@@ -447,10 +551,43 @@ export default function ChatRoomScreen() {
                         </View>
                     ) : (
                         <FlatList
+                            ref={flatListRef}
                             data={messages}
                             keyExtractor={(item, index) => `${item.id}-${index}`}
                             renderItem={renderItem}
                             contentContainerStyle={styles.messagesContent}
+                            ListHeaderComponent={
+                                loadingMore ? (
+                                    <View style={styles.loadMoreIndicator}>
+                                        <ActivityIndicator size="small" color="#6b7280" />
+                                    </View>
+                                ) : null
+                            }
+                            onScroll={({ nativeEvent }) => {
+                                const { contentOffset, layoutMeasurement, contentSize } =
+                                    nativeEvent;
+
+                                // Load thêm tin nhắn cũ khi kéo lên đỉnh
+                                if (contentOffset.y <= 0 && !loadingMore && hasMore) {
+                                    void loadMoreMessages();
+                                }
+
+                                // Cập nhật trạng thái đang ở gần cuối hay không
+                                const distanceFromBottom =
+                                    contentSize.height -
+                                    (contentOffset.y + layoutMeasurement.height);
+                                const isNearBottom = distanceFromBottom < 40;
+                                shouldAutoScrollRef.current = isNearBottom;
+                            }}
+                            scrollEventThrottle={16}
+                            onContentSizeChange={() => {
+                                // Chỉ auto scroll khi:
+                                // - không phải đang load tin nhắn cũ
+                                // - đang ở gần cuối (hoặc vừa vào phòng / vừa gửi tin)
+                                if (!loadingMore && shouldAutoScrollRef.current) {
+                                    flatListRef.current?.scrollToEnd({ animated: true });
+                                }
+                            }}
                             refreshControl={
                                 <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
                             }
@@ -564,6 +701,11 @@ const styles = StyleSheet.create({
     },
     loadingWrap: {
         flex: 1,
+        alignItems: "center",
+        justifyContent: "center",
+    },
+    loadMoreIndicator: {
+        paddingVertical: 8,
         alignItems: "center",
         justifyContent: "center",
     },
@@ -682,6 +824,33 @@ const styles = StyleSheet.create({
     messageBubbleOther: {
         backgroundColor: "#e5e5ea",
     },
+    messageAvatarWrap: {
+        marginRight: 6,
+        alignSelf: "flex-end",
+    },
+    messageAvatar: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: "#e5e7eb",
+    },
+    messageAvatarFallback: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: "#e5e7eb",
+        alignItems: "center",
+        justifyContent: "center",
+    },
+    messageAvatarInitial: {
+        fontSize: 14,
+        fontWeight: "600",
+        color: "#4b5563",
+    },
+    messageTimeRow: {
+        alignSelf: "flex-start",
+        marginTop: 2,
+    },
     messageText: {
         fontSize: 15,
         color: "#111",
@@ -692,8 +861,7 @@ const styles = StyleSheet.create({
     messageTime: {
         fontSize: 11,
         color: "#9ca3af",
-        marginTop: 2,
-        textAlign: "right",
+        textAlign: "left",
     },
     messageTimeMine: {
         color: "#d1d5db",

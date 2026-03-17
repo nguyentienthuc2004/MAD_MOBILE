@@ -89,10 +89,15 @@ export const chatService = {
         });
     },
 
-    getMessages(roomId: string) {
-        return apiAuthRequest<GetMessagesResponse>(`/chat/rooms/${roomId}/messages`, {
-            method: "GET",
-        });
+    getMessages(roomId: string, params?: { before?: string }) {
+        const query = params?.before ? `?before=${encodeURIComponent(params.before)}` : "";
+
+        return apiAuthRequest<GetMessagesResponse>(
+            `/chat/rooms/${roomId}/messages${query}`,
+            {
+                method: "GET",
+            },
+        );
     },
 
     sendMessage(roomId: string, content: string) {
