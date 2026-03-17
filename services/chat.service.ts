@@ -64,6 +64,10 @@ type SendMessageResponse = ApiEnvelope<{
     message: MessageDto;
 }>;
 
+type EditNicknamesResponse = ApiEnvelope<{
+    room: RoomChatDto;
+}>;
+
 export const chatService = {
     getRooms() {
         return apiAuthRequest<GetRoomsResponse>("/chat/rooms", {
@@ -95,6 +99,13 @@ export const chatService = {
         return apiAuthRequest<SendMessageResponse>(`/chat/rooms/${roomId}/messages`, {
             method: "POST",
             body: { content },
+        });
+    },
+
+    updateNickname(roomId: string, userId: string, nickname: string) {
+        return apiAuthRequest<EditNicknamesResponse>(`/chat/rooms/${roomId}/users/${userId}/nickname`, {
+            method: "PATCH",
+            body: { nickname },
         });
     },
 };
