@@ -26,6 +26,7 @@ type Props = {
   onCommentAdded?: (c: Comment) => void;
   onEditRequested?: (c: Comment) => void;
   highlightId?: string | null;
+  headerComponent?: React.ReactNode;
 };
 
 type ListItem = Comment & { isReply?: boolean };
@@ -42,6 +43,7 @@ function CommentList(
     onCommentAdded,
     onEditRequested,
     highlightId,
+    headerComponent,
   }: Props,
   ref: any,
 ) {
@@ -330,6 +332,9 @@ function CommentList(
       ref={flatRef}
       data={buildData()}
       keyExtractor={(i) => getId(i)}
+      ListHeaderComponent={
+        headerComponent ? () => <>{headerComponent}</> : undefined
+      }
       renderItem={({ item }) => {
         if (item.isReply) {
           const rid = (item as any).id ?? (item as any)._id;

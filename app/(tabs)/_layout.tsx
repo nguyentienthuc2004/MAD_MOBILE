@@ -1,8 +1,9 @@
+import NotificationBadge from "@/components/notifications/NotificationBadge";
 import { useAuth } from "@/stores/auth.store";
+import { useNotifications } from "@/stores/notification.store";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
-import { useState } from "react";
-import { Image } from "react-native";
+import { Image, StyleSheet, View } from "react-native";
 const TabsLayout = () => {
   const user = useAuth((state) => state.user);
   return (
@@ -43,13 +44,21 @@ const TabsLayout = () => {
         name="notification"
         options={{
           title: "Notification",
-          tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons
-              name={focused ? "heart" : "heart-outline"}
-              size={focused ? size + 3 : size}
-              color={color}
-            />
-          ),
+          tabBarIcon: ({ color, size, focused }) => {
+            const unread = useNotifications((s) => s.unreadCount);
+            return (
+              <View style={styles.iconWrap}>
+                <Ionicons
+                  name={focused ? "heart" : "heart-outline"}
+                  size={focused ? size + 3 : size}
+                  color={color}
+                />
+                <View style={styles.badgeWrap} pointerEvents="none">
+                  <NotificationBadge count={unread} size={14} />
+                </View>
+              </View>
+            );
+          },
         }}
       />
       <Tabs.Screen
@@ -83,3 +92,17 @@ const TabsLayout = () => {
 };
 
 export default TabsLayout;
+
+const styles = StyleSheet.create({
+  iconWrap: {
+    width: 32,
+    height: 32,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  badgeWrap: {
+    position: "absolute",
+    top: -4,
+    right: -8,
+  },
+});

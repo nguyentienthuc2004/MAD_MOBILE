@@ -36,6 +36,13 @@ export const commentService = {
     );
   },
 
+  getCommentById(postId: string, commentId: string) {
+    return apiAuthRequest<ApiResponse<{ comment: Comment }>>(
+      `/posts/${postId}/comments/${commentId}`,
+      { method: "GET" },
+    );
+  },
+
   createComment(postId: string, content: string) {
     return apiAuthRequest<ApiResponse<{ comment: Comment }>>(
       `/posts/${postId}/comments`,

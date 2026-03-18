@@ -90,7 +90,7 @@ const buildUrl = (path: string) => {
   if (/^https?:\/\//.test(path)) return path;
   return `${API_BASE_URL}${path.startsWith("/") ? path : `/${path}`}`;
 };
-
+console.log("API_BASE_URL =", API_BASE_URL);
 //tao axios client mac dinh
 const createClient = (): AxiosInstance =>
   axios.create({

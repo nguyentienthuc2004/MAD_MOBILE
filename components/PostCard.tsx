@@ -37,7 +37,9 @@ const isPlaybackInterruptionError = (error: unknown) => {
   }
 
   const message = error.message.toLowerCase();
-  return message.includes("seeking interrupted") || message.includes("interrupted");
+  return (
+    message.includes("seeking interrupted") || message.includes("interrupted")
+  );
 };
 
 const formatPostTime = (createdAt?: string) => {
@@ -130,11 +132,14 @@ type PostCardMenuAction = {
 
 type PostCardProps = {
   post: Post;
+  liked?: boolean;
+  likeCount?: number;
   isActive?: boolean;
   isFeedMuted?: boolean;
   canFollow?: boolean;
   isFollowing?: boolean;
   isOwnPost?: boolean;
+  onToggleLike?: () => Promise<void> | void;
   onToggleFeedMuted?: () => void;
   onToggleFollow?: (nextValue: boolean) => void;
   onPressUser?: () => void;
@@ -147,6 +152,9 @@ type PostCardProps = {
 
 export default function PostCard({
   post,
+  liked: propLiked,
+  likeCount: propLikeCount,
+  onToggleLike,
   isActive = true,
   isFeedMuted = true,
   canFollow = true,
@@ -174,20 +182,24 @@ export default function PostCard({
   const postHashtagLabel = formatHashtagText(post.hashtags);
   const isFollowing = controlledIsFollowing ?? internalIsFollowing;
   const postId = (post as any).id ?? (post as any)._id ?? (post as any).postId;
-  const [liked, setLiked] = useState(false);
-  const [likeCount, setLikeCount] = useState(
+  const [localLiked, setLocalLiked] = useState(false);
+  const [localLikeCount, setLocalLikeCount] = useState(
     (post as any).likeCount ?? (post as any).likes ?? 0,
   );
   const [isLiking, setIsLiking] = useState(false);
+  const effectiveLiked = propLiked ?? localLiked;
+  const effectiveLikeCount = propLikeCount ?? localLikeCount;
   const accessToken = useAuth((s) => s.accessToken);
 
   useEffect(() => {
+    if (propLiked !== undefined) return;
+
     let mounted = true;
     (async () => {
       try {
         const res = await likeService.checkLikeStatus("post", postId);
         if (!mounted) return;
-        setLiked(!!res.data?.liked);
+        setLocalLiked(!!res.data?.liked);
       } catch (err) {}
     })();
 
@@ -197,8 +209,9 @@ export default function PostCard({
   }, [postId]);
 
   useEffect(() => {
+    if (propLikeCount !== undefined) return;
     const incoming = (post as any).likeCount ?? (post as any).likes ?? 0;
-    setLikeCount(incoming);
+    setLocalLikeCount(incoming);
   }, [post, (post as any).likeCount, (post as any).likes]);
 
   const resolvedMenuActions: PostCardMenuAction[] =
@@ -366,27 +379,35 @@ export default function PostCard({
 
   const handleLikePost = async () => {
     const id = postId;
-    if (!id || isLiking) {
+    if (!id || isLiking) return;
+
+    if (onToggleLike) {
+      try {
+        setIsLiking(true);
+        await onToggleLike();
+      } finally {
+        setIsLiking(false);
+      }
       return;
     }
 
-    const prevLiked = liked;
-    const prevLikeCount = likeCount ?? 0;
+    const prevLiked = effectiveLiked;
+    const prevLikeCount = effectiveLikeCount ?? 0;
     const nextLiked = !prevLiked;
 
-    // Optimistic update: toggle visual state immediately
-    setLiked(nextLiked);
-    setLikeCount(Math.max(0, prevLikeCount + (nextLiked ? 1 : -1)));
-    setIsLiking(true);
+    if (propLiked === undefined) setLocalLiked(nextLiked);
+    if (propLikeCount === undefined)
+      setLocalLikeCount(Math.max(0, prevLikeCount + (nextLiked ? 1 : -1)));
 
+    setIsLiking(true);
     try {
       const res = await likeService.likePost(id);
-
-      setLiked(!!res.data?.liked);
-      setLikeCount(res.data?.likeCount ?? prevLikeCount);
+      if (propLiked === undefined) setLocalLiked(!!res.data?.liked);
+      if (propLikeCount === undefined)
+        setLocalLikeCount(res.data?.likeCount ?? prevLikeCount);
     } catch (err) {
-      setLiked(prevLiked);
-      setLikeCount(prevLikeCount);
+      if (propLiked === undefined) setLocalLiked(prevLiked);
+      if (propLikeCount === undefined) setLocalLikeCount(prevLikeCount);
     } finally {
       setIsLiking(false);
     }
@@ -485,9 +506,9 @@ export default function PostCard({
             activeOpacity={0.7}
           >
             <Ionicons
-              name={liked ? "heart" : "heart-outline"}
+              name={effectiveLiked ? "heart" : "heart-outline"}
               size={22}
-              color={liked ? "#E0245E" : "#111"}
+              color={effectiveLiked ? "#E0245E" : "#111"}
             />
           </TouchableOpacity>
           <Pressable
@@ -506,7 +527,7 @@ export default function PostCard({
       </View>
 
       <Text style={styles.likesText}>
-        {(likeCount ?? 0).toLocaleString()} likes
+        {(effectiveLikeCount ?? 0).toLocaleString()} likes
       </Text>
       <Text style={styles.caption} numberOfLines={2}>
         <Text style={styles.captionUser}>{post.userName} </Text>
