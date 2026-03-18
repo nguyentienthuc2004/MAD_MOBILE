@@ -63,8 +63,14 @@ export default function ChatRoomScreen() {
     const [hasMore, setHasMore] = useState(true);
     const [oldestCursor, setOldestCursor] = useState<string | null>(null);
 
+    const [typingUsers, setTypingUsers] = useState<
+        { userId: string; name?: string }[]
+    >([]);
+
     const flatListRef = useRef<FlatList<ChatMessage> | null>(null);
     const shouldAutoScrollRef = useRef<boolean>(true);
+    const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const isTypingRef = useRef<boolean>(false);
 
     const meId = user?._id ?? null;
 
@@ -258,6 +264,54 @@ export default function ChatRoomScreen() {
 
         const roomKey = String(roomId);
 
+        const handleTyping = (payload: {
+            roomId: string;
+            userId: string;
+            name?: string;
+        }) => {
+            try {
+                if (!payload) return;
+
+                const key = String(roomId);
+                if (String(payload.roomId) !== key) return;
+
+                // Bỏ qua nếu là chính mình
+                if (meId && String(payload.userId) === String(meId)) return;
+
+                setTypingUsers((prev) => {
+                    const exists = prev.some(
+                        (u) => String(u.userId) === String(payload.userId),
+                    );
+                    if (exists) return prev;
+
+                    return [
+                        ...prev,
+                        {
+                            userId: String(payload.userId),
+                            name: payload.name,
+                        },
+                    ];
+                });
+            } catch (error) {
+                console.log("[CHAT] SERVER_TYPING handle error", error);
+            }
+        };
+
+        const handleStopTyping = (payload: { roomId: string; userId: string }) => {
+            try {
+                if (!payload) return;
+
+                const key = String(roomId);
+                if (String(payload.roomId) !== key) return;
+
+                setTypingUsers((prev) =>
+                    prev.filter((u) => String(u.userId) !== String(payload.userId)),
+                );
+            } catch (error) {
+                console.log("[CHAT] SERVER_STOP_TYPING handle error", error);
+            }
+        };
+
         const handleIncoming = (m: MessageDto) => {
             console.log("[CHAT] SERVER_SEND_MESSAGE received", {
                 roomId: roomKey,
@@ -346,6 +400,8 @@ export default function ChatRoomScreen() {
         console.log("[CHAT] Register SERVER_SEND_MESSAGE listener");
         socket.on("SERVER_SEND_MESSAGE", handleIncoming);
         socket.on("SERVER_NICKNAME_CHANGED", handleNicknameChanged);
+        socket.on("SERVER_TYPING", handleTyping);
+        socket.on("SERVER_STOP_TYPING", handleStopTyping);
 
         return () => {
             console.log("[CHAT] Cleanup SERVER_SEND_MESSAGE listener", {
@@ -354,6 +410,24 @@ export default function ChatRoomScreen() {
             });
             socket.off("SERVER_SEND_MESSAGE", handleIncoming);
             socket.off("SERVER_NICKNAME_CHANGED", handleNicknameChanged);
+            socket.off("SERVER_TYPING", handleTyping);
+            socket.off("SERVER_STOP_TYPING", handleStopTyping);
+
+            // Khi rời màn chat, gửi stop typing nếu đang ở trạng thái typing
+            if (typingTimeoutRef.current) {
+                clearTimeout(typingTimeoutRef.current);
+                typingTimeoutRef.current = null;
+            }
+
+            if (roomKey && meId && isTypingRef.current) {
+                socket.emit("CLIENT_STOP_TYPING", {
+                    roomId: roomKey,
+                    userId: meId,
+                });
+            }
+
+            isTypingRef.current = false;
+            setTypingUsers([]);
         };
     }, [roomId, meId]);
 
@@ -362,6 +436,21 @@ export default function ChatRoomScreen() {
         if (!text || !roomId || sending) return;
 
         try {
+            // Khi gửi tin nhắn thì dừng trạng thái đang nhập
+            const roomKey = String(roomId);
+            if (typingTimeoutRef.current) {
+                clearTimeout(typingTimeoutRef.current);
+                typingTimeoutRef.current = null;
+            }
+
+            if (roomKey && meId && isTypingRef.current) {
+                socket.emit("CLIENT_STOP_TYPING", {
+                    roomId: roomKey,
+                    userId: meId,
+                });
+            }
+            isTypingRef.current = false;
+
             // Khi mình gửi tin nhắn thì luôn muốn cuộn xuống cuối
             shouldAutoScrollRef.current = true;
             setSending(true);
@@ -680,6 +769,16 @@ export default function ChatRoomScreen() {
                     )}
                 </View>
 
+                {typingUsers.length > 0 && (
+                    <View style={styles.typingIndicatorRow}>
+                        <Text style={styles.typingIndicatorText}>
+                            {typingUsers.length === 1
+                                ? `${typingUsers[0].name || "Ai đó"} đang nhập...`
+                                : "Nhiều người đang nhập..."}
+                        </Text>
+                    </View>
+                )}
+
                 <View style={styles.inputRow}>
                     <View style={styles.inputActions}>
                         <Pressable
@@ -705,7 +804,42 @@ export default function ChatRoomScreen() {
                         placeholder="Nhắn tin..."
                         placeholderTextColor="#9ca3af"
                         value={input}
-                        onChangeText={setInput}
+                        onChangeText={(text) => {
+                            setInput(text);
+
+                            if (!roomId || !meId) return;
+
+                            const roomKey = String(roomId);
+
+                            if (!isTypingRef.current) {
+                                isTypingRef.current = true;
+                                socket.emit("CLIENT_TYPING", {
+                                    roomId: roomKey,
+                                    userId: meId,
+                                    name:
+                                        (user as any)?.fullName ||
+                                        (user as any)?.name ||
+                                        (user as any)?.username ||
+                                        "Người dùng",
+                                });
+                            }
+
+                            if (typingTimeoutRef.current) {
+                                clearTimeout(typingTimeoutRef.current);
+                            }
+
+                            typingTimeoutRef.current = setTimeout(() => {
+                                if (!roomKey || !meId) return;
+
+                                socket.emit("CLIENT_STOP_TYPING", {
+                                    roomId: roomKey,
+                                    userId: meId,
+                                });
+
+                                isTypingRef.current = false;
+                                typingTimeoutRef.current = null;
+                            }, 800);
+                        }}
                         multiline
                     />
 
@@ -1004,5 +1138,14 @@ const styles = StyleSheet.create({
     },
     sendButtonDisabled: {
         backgroundColor: "#9ca3af",
+    },
+    typingIndicatorRow: {
+        paddingHorizontal: 16,
+        paddingBottom: 4,
+    },
+    typingIndicatorText: {
+        fontSize: 12,
+        color: "#6b7280",
+        fontStyle: "italic",
     },
 });
