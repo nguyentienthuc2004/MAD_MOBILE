@@ -4,6 +4,7 @@ import CommentList from "@/components/comments/CommentList";
 import PostCard, { type Post as FeedPost } from "@/components/PostCard";
 import { useAuth } from "@/hooks/useAuth";
 import { ApiError } from "@/services/api";
+import likeService from "@/services/like.service";
 import { postService } from "@/services/post.service";
 import { userService, type AppUser } from "@/services/user.service";
 import { Stack, useLocalSearchParams } from "expo-router";
@@ -19,11 +20,6 @@ export default function SinglePostView() {
   const username = String(params.username ?? "");
   const scrollToCommentId = String(params.scrollToCommentId ?? "");
   const rootCommentId = String(params.rootCommentId ?? "");
-  console.log("[SinglePost] params:", {
-    postId,
-    scrollToCommentId,
-    rootCommentId,
-  });
 
   const user = useAuth((s) => s.user);
   const [loading, setLoading] = useState(false);
@@ -31,6 +27,8 @@ export default function SinglePostView() {
   const [notFound, setNotFound] = useState(false);
   const [post, setPost] = useState<any | null>(null);
   const [owner, setOwner] = useState<AppUser | null>(null);
+  const [postLiked, setPostLiked] = useState<boolean | null>(null);
+  const [postLikeCount, setPostLikeCount] = useState<number | null>(null);
   const commentListRef = useRef<any>(null);
 
   useEffect(() => {
@@ -43,14 +41,15 @@ export default function SinglePostView() {
 
       try {
         const res = await postService.getPostById(postId);
-        if (res?.data) setPost(res.data);
-        console.log("[SinglePost] post loaded", res?.data);
+        if (res?.data) {
+          setPost(res.data);
+          setPostLikeCount(res.data?.likeCount ?? null);
+        }
         const uid = res?.data?.userId;
         if (uid) {
           try {
             const userRes = await userService.getUserById(String(uid));
             if (userRes?.data) setOwner(userRes.data);
-            console.log("[SinglePost] owner loaded", userRes?.data);
           } catch {}
         }
       } catch (e: any) {
@@ -67,30 +66,88 @@ export default function SinglePostView() {
   }, [postId]);
 
   useEffect(() => {
+    if (!postId) return;
+    let mounted = true;
+    (async () => {
+      try {
+        const res = await likeService.checkLikeStatus("post", postId);
+        if (!mounted) return;
+        setPostLiked(!!res.data?.liked);
+      } catch (err) {}
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, [postId]);
+
+  const togglePostLike = async () => {
+    if (!postId) return;
+    const prev = postLiked ?? false;
+    const prevCount = postLikeCount ?? post?.likeCount ?? post?.likes ?? 0;
+
+    setPostLiked(!prev);
+    setPostLikeCount(Math.max(0, prevCount + (!prev ? 1 : -1)));
+
+    try {
+      const res = await likeService.likePost(postId);
+      setPostLiked(!!res.data?.liked);
+      setPostLikeCount(res.data?.likeCount ?? prevCount);
+    } catch (err) {
+      setPostLiked(prev);
+      setPostLikeCount(prevCount);
+    }
+  };
+
+  useEffect(() => {
     if (!postId || !commentListRef) return;
 
     const tryOpen = (tries = 0) => {
       const ref = commentListRef.current;
-      console.log("[SinglePost] tryOpen ref", { refPresent: !!ref, tries });
       if (ref) {
-        if (rootCommentId) {
+        const doOpenThread = (rId?: string, sId?: string) => {
           if (typeof ref.openThread === "function") {
             try {
-              ref.openThread(rootCommentId, scrollToCommentId || undefined);
-              console.log("[SinglePost] called openThread", {
-                rootCommentId,
-                scrollToCommentId,
-              });
+              ref.openThread(rId ?? "", sId ?? undefined);
+              return true;
+            } catch (err) {}
+          }
+          return false;
+        };
+
+        if (rootCommentId) {
+          if (doOpenThread(rootCommentId, scrollToCommentId || undefined))
+            return;
+        }
+
+        if (scrollToCommentId) {
+          if (typeof ref.openThread === "function") {
+            try {
+              const { commentService } = require("@/services/comment.service");
+              commentService
+                .getCommentById(postId, scrollToCommentId)
+                .then((r: any) => {
+                  const c = r?.data?.comment;
+                  const resolvedRoot =
+                    c?.rootCommentId ?? c?.parentCommentId ?? c?._id;
+                  if (resolvedRoot) {
+                    doOpenThread(resolvedRoot, scrollToCommentId);
+                  } else {
+                    if (typeof ref.scrollToComment === "function") {
+                      try {
+                        ref.scrollToComment(scrollToCommentId);
+                      } catch (err) {}
+                    }
+                  }
+                })
+                .catch((err: any) => {});
+            } catch (err) {}
+          } else if (typeof ref.scrollToComment === "function") {
+            try {
+              ref.scrollToComment(scrollToCommentId);
               return;
             } catch {}
           }
-        }
-
-        if (scrollToCommentId && typeof ref.scrollToComment === "function") {
-          try {
-            ref.scrollToComment(scrollToCommentId);
-            return;
-          } catch {}
         }
       }
 
@@ -124,7 +181,29 @@ export default function SinglePostView() {
       createdAt: post.createdAt,
       musicUrl: post.musicId ?? undefined,
     };
-  }, [post, user?._id]);
+  }, [post, user?._id, owner]);
+
+  const headerComponent = React.useMemo(() => {
+    if (!feedPost) return null;
+    return (
+      <PostCard
+        post={feedPost}
+        liked={postLiked ?? undefined}
+        likeCount={postLikeCount ?? undefined}
+        onToggleLike={togglePostLike}
+        isActive={true}
+        isOwnPost={String(post.userId) === String(user?._id)}
+        onPressComment={() => {}}
+      />
+    );
+  }, [
+    feedPost,
+    post?.userId,
+    user?._id,
+    postLiked,
+    postLikeCount,
+    togglePostLike,
+  ]);
 
   return (
     <>
@@ -161,14 +240,7 @@ export default function SinglePostView() {
               ref={commentListRef}
               postId={postId}
               highlightId={rootCommentId || scrollToCommentId || null}
-              headerComponent={
-                <PostCard
-                  post={feedPost}
-                  isActive={true}
-                  isOwnPost={String(post.userId) === String(user?._id)}
-                  onPressComment={() => {}}
-                />
-              }
+              headerComponent={headerComponent}
             />
 
             <CommentInput postId={postId} onCommentAdded={() => {}} />
