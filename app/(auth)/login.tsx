@@ -2,13 +2,14 @@ import { useAuth } from "@/hooks/useAuth";
 import { Link } from "expo-router";
 import { useState } from "react";
 import {
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
+    Image,
+    KeyboardAvoidingView,
+    Platform,
+    Pressable,
+    StyleSheet,
+    Text,
+    TextInput,
+    View,
 } from "react-native";
 
 export default function LoginScreen() {
@@ -53,8 +54,15 @@ export default function LoginScreen() {
       behavior={Platform.OS === "ios" ? "padding" : undefined}
       style={styles.container}
     >
+      <View style={styles.logoContainer}>
+        <Image
+          source={require("../../assets/images/logo-app.jpg")}
+          style={styles.logo}
+          resizeMode="cover"
+        />
+      </View>
+
       <View style={styles.card}>
-        <Text style={styles.title}>Đăng nhập</Text>
         <TextInput
           placeholder="Email"
           autoCapitalize="none"
@@ -94,7 +102,10 @@ export default function LoginScreen() {
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
         <Pressable
-          style={[styles.button, isSubmitting && styles.buttonDisabled]}
+          style={[
+            styles.button,
+            isSubmitting ? styles.buttonDisabled : undefined,
+          ]}
           onPress={handleLogin}
           disabled={isSubmitting}
         >
@@ -103,12 +114,16 @@ export default function LoginScreen() {
           </Text>
         </Pressable>
 
-        <Link href="/forgot-password" style={styles.link}>
+        <Link href="/forgot-password" style={styles.linkPrimary}>
           Quên mật khẩu?
         </Link>
-        <Link href="/register" style={styles.link}>
-          Chưa có tài khoản? Đăng ký
-        </Link>
+
+        <View style={styles.rowLink}>
+          <Text style={styles.mutedText}>Chưa có tài khoản? </Text>
+          <Link href="/register" style={styles.linkPrimaryInline}>
+            Đăng ký
+          </Link>
+        </View>
       </View>
     </KeyboardAvoidingView>
   );
@@ -119,9 +134,13 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     padding: 16,
+    backgroundColor: "#fff",
   },
   card: {
     gap: 12,
+    backgroundColor: "#fff",
+    padding: 12,
+    borderRadius: 10,
   },
   title: {
     fontSize: 24,
@@ -139,7 +158,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingVertical: 12,
     alignItems: "center",
-    backgroundColor: "#111",
+    backgroundColor: "#3797EF",
     marginTop: 4,
   },
   buttonText: {
@@ -147,12 +166,39 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   buttonDisabled: {
-    opacity: 0.7,
+    backgroundColor: "#95C6F8",
   },
   errorText: {
     color: "#dc2626",
   },
   link: {
     textAlign: "center",
+  },
+  linkPrimary: {
+    textAlign: "center",
+    color: "#2b7fd6",
+    marginTop: 8,
+  },
+  linkPrimaryInline: {
+    color: "#2b7fd6",
+  },
+  mutedText: {
+    color: "#9ca3af",
+  },
+  rowLink: {
+    flexDirection: "row",
+    justifyContent: "center",
+    marginTop: 8,
+  },
+  logoContainer: {
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  logo: {
+    width: 120,
+    height: 120,
+    borderRadius: 16,
+    marginBottom: 8,
+    backgroundColor: "#fff",
   },
 });
