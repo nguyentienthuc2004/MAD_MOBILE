@@ -4,6 +4,7 @@ import CommentList from "@/components/comments/CommentList";
 import PostCard, { type Post as FeedPost } from "@/components/PostCard";
 import { useAuth } from "@/hooks/useAuth";
 import { ApiError } from "@/services/api";
+import type { Comment } from "@/services/comment.service";
 import likeService from "@/services/like.service";
 import { postService } from "@/services/post.service";
 import { userService, type AppUser } from "@/services/user.service";
@@ -30,6 +31,8 @@ export default function SinglePostView() {
   const [postLiked, setPostLiked] = useState<boolean | null>(null);
   const [postLikeCount, setPostLikeCount] = useState<number | null>(null);
   const commentListRef = useRef<any>(null);
+  const [replyTarget, setReplyTarget] = useState<Comment | null>(null);
+  const [editTarget, setEditTarget] = useState<Comment | null>(null);
 
   useEffect(() => {
     if (!postId) return;
@@ -157,6 +160,59 @@ export default function SinglePostView() {
     if (scrollToCommentId || rootCommentId) setTimeout(() => tryOpen(), 200);
   }, [postId, scrollToCommentId, rootCommentId]);
 
+  const handleReplyRequested = (c: Comment) => {
+    setReplyTarget(c);
+    setEditTarget(null);
+  };
+
+  const handleEditRequested = (c: Comment) => {
+    setEditTarget(c);
+    setReplyTarget(null);
+  };
+
+  const handleCancelReply = () => {
+    setReplyTarget(null);
+    setEditTarget(null);
+  };
+
+  const handleCommentAdded = (c: Comment) => {
+    try {
+      commentListRef.current?.addComment?.(c);
+
+      setReplyTarget(null);
+      setEditTarget(null);
+
+      const cid = (c as any).id ?? (c as any)._id;
+
+      if (c.parentCommentId) {
+        const rootId = c.rootCommentId ?? c.parentCommentId;
+        if (rootId) {
+          setTimeout(() => {
+            commentListRef.current?.openThread?.(rootId, cid);
+          }, 120);
+        }
+      } else {
+        setTimeout(() => {
+          if (cid) commentListRef.current?.scrollToComment?.(cid);
+        }, 120);
+      }
+    } catch (err) {}
+  };
+
+  const handleCommentEdited = (c: Comment) => {
+    try {
+      commentListRef.current?.updateComment?.(c);
+      setEditTarget(null);
+
+      const cid = (c as any).id ?? (c as any)._id;
+      if (cid) {
+        setTimeout(() => {
+          commentListRef.current?.scrollToComment?.(cid);
+        }, 120);
+      }
+    } catch (err) {}
+  };
+
   const feedPost = useMemo<FeedPost | null>(() => {
     if (!post) return null;
 
@@ -241,9 +297,19 @@ export default function SinglePostView() {
               postId={postId}
               highlightId={rootCommentId || scrollToCommentId || null}
               headerComponent={headerComponent}
+              onReplyRequested={handleReplyRequested}
+              onEditRequested={handleEditRequested}
+              onCommentAdded={handleCommentAdded}
             />
 
-            <CommentInput postId={postId} onCommentAdded={() => {}} />
+            <CommentInput
+              postId={postId}
+              replyTarget={replyTarget}
+              editTarget={editTarget}
+              onCancelReply={handleCancelReply}
+              onCommentAdded={handleCommentAdded}
+              onCommentEdited={handleCommentEdited}
+            />
           </>
         ) : null}
       </SafeAreaView>
