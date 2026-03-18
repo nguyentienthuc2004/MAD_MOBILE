@@ -42,9 +42,7 @@
       [
         "expo-media-library",
         {
-          "granularPermissions": [
-            "photo"
-          ]
+          "granularPermissions": ["photo"]
         }
       ],
       "expo-secure-store"
