@@ -1,7 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Animated,
+  Easing,
   Image,
   Pressable,
   StyleSheet,
@@ -54,6 +56,8 @@ export default function CommentCard({
     (comment as any).likeCount ?? undefined,
   );
 
+  const mountAnim = useRef(new Animated.Value(0)).current;
+
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -77,6 +81,15 @@ export default function CommentCard({
     };
   }, [comment]);
 
+  useEffect(() => {
+    Animated.timing(mountAnim, {
+      toValue: 1,
+      duration: variant === "reply" ? 320 : 220,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [variant, mountAnim]);
+
   async function handleLike() {
     const id = (comment as any).id ?? (comment as any)._id;
     try {
@@ -88,103 +101,138 @@ export default function CommentCard({
     }
   }
 
+  const wrapperStyle =
+    variant === "reply"
+      ? [
+          {
+            transform: [
+              {
+                translateY: mountAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [-8, 0],
+                }),
+              },
+            ],
+            opacity: mountAnim,
+          },
+        ]
+      : undefined;
+
   return (
-    <Pressable
-      onLongPress={onLongPress}
-      style={
-        isHighlighted ? [styles.container, styles.highlight] : styles.container
-      }
-    >
-      {avatar ? (
-        <Image
-          source={{ uri: avatar }}
-          style={variant === "reply" ? styles.avatarReply : styles.avatar}
-        />
-      ) : (
+    <Animated.View style={wrapperStyle}>
+      <Pressable
+        onLongPress={onLongPress}
+        style={
+          isHighlighted
+            ? [
+                variant === "reply" ? styles.containerReply : styles.container,
+                styles.highlight,
+              ]
+            : variant === "reply"
+              ? styles.containerReply
+              : styles.container
+        }
+      >
+        {avatar ? (
+          <Image
+            source={{ uri: avatar }}
+            style={variant === "reply" ? styles.avatarReply : styles.avatar}
+          />
+        ) : (
+          <View
+            style={
+              variant === "reply"
+                ? [styles.avatarReply, styles.avatarPlaceholder]
+                : [styles.avatar, styles.avatarPlaceholder]
+            }
+          >
+            <Text style={styles.avatarLetter}>
+              {username?.charAt(0)?.toUpperCase()}
+            </Text>
+          </View>
+        )}
+
+        <View style={styles.body}>
+          <View style={styles.headRow}>
+            <Text
+              style={[
+                variant === "reply" ? styles.usernameReply : styles.username,
+                isHighlighted && styles.usernameHighlighted,
+              ]}
+              numberOfLines={1}
+            >
+              {username}
+            </Text>
+            <Text style={variant === "reply" ? styles.timeReply : styles.time}>
+              {timeAgo(comment.createdAt)}
+            </Text>
+          </View>
+
+          <Text
+            style={[styles.content, isHighlighted && styles.contentHighlighted]}
+            numberOfLines={2}
+          >
+            {comment.content}
+          </Text>
+
+          <View
+            style={
+              variant === "reply" ? styles.actionsRowReply : styles.actionsRow
+            }
+          >
+            <TouchableOpacity
+              style={styles.actionBtn}
+              onPress={onPressReply}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.actionText}>Trả lời</Text>
+            </TouchableOpacity>
+          </View>
+
+          {onPressReplies &&
+          typeof comment.replyCount === "number" &&
+          comment.replyCount > 0 ? (
+            <View style={styles.viewRepliesContainer}>
+              {loadingReplies ? (
+                <ActivityIndicator size="small" />
+              ) : isExpanded ? (
+                <TouchableOpacity onPress={onPressReplies} activeOpacity={0.7}>
+                  <Text style={styles.viewRepliesText}>Ẩn câu trả lời</Text>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity
+                  onPress={onPressReplies}
+                  style={styles.viewRepliesRow}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.viewRepliesLine} />
+                  <Text
+                    style={styles.viewRepliesText}
+                  >{`Xem ${comment.replyCount} câu trả lời khác`}</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          ) : null}
+        </View>
+
         <View
           style={
-            variant === "reply"
-              ? [styles.avatarReply, styles.avatarPlaceholder]
-              : [styles.avatar, styles.avatarPlaceholder]
+            variant === "reply" ? styles.likeColumnReply : styles.likeColumn
           }
         >
-          <Text style={styles.avatarLetter}>
-            {username?.charAt(0)?.toUpperCase()}
-          </Text>
-        </View>
-      )}
-
-      <View style={styles.body}>
-        <View style={styles.headRow}>
-          <Text
-            style={[
-              variant === "reply" ? styles.usernameReply : styles.username,
-              isHighlighted && styles.usernameHighlighted,
-            ]}
-            numberOfLines={1}
-          >
-            {username}
-          </Text>
-          <Text style={variant === "reply" ? styles.timeReply : styles.time}>
-            {timeAgo(comment.createdAt)}
-          </Text>
-        </View>
-
-        <Text
-          style={[styles.content, isHighlighted && styles.contentHighlighted]}
-          numberOfLines={2}
-        >
-          {comment.content}
-        </Text>
-
-        <View style={styles.actionsRow}>
-          <TouchableOpacity
-            style={styles.actionBtn}
-            onPress={onPressReply}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.actionText}>Trả lời</Text>
+          <TouchableOpacity onPress={handleLike} style={styles.likeBtn}>
+            <Ionicons
+              name={liked ? "heart" : "heart-outline"}
+              size={variant === "reply" ? 16 : 18}
+              color={liked ? "#ff3b30" : "#444"}
+            />
           </TouchableOpacity>
+          <Text style={styles.likeCountText}>
+            {(likeCount ?? 0).toString()}
+          </Text>
         </View>
-
-        {onPressReplies &&
-        typeof comment.replyCount === "number" &&
-        comment.replyCount > 0 ? (
-          <View style={styles.viewRepliesContainer}>
-            {loadingReplies ? (
-              <ActivityIndicator size="small" />
-            ) : isExpanded ? (
-              <TouchableOpacity onPress={onPressReplies} activeOpacity={0.7}>
-                <Text style={styles.viewRepliesText}>Ẩn câu trả lời</Text>
-              </TouchableOpacity>
-            ) : (
-              <TouchableOpacity
-                onPress={onPressReplies}
-                style={styles.viewReplies}
-                activeOpacity={0.7}
-              >
-                <Text
-                  style={styles.viewRepliesText}
-                >{`Xem ${comment.replyCount} câu trả lời`}</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        ) : null}
-      </View>
-
-      <View
-        style={variant === "reply" ? styles.likeColumnReply : styles.likeColumn}
-      >
-        <TouchableOpacity onPress={handleLike} style={styles.likeBtn}>
-          <Ionicons
-            name={liked ? "heart" : "heart-outline"}
-            size={variant === "reply" ? 16 : 18}
-            color={liked ? "#ff3b30" : "#444"}
-          />
-        </TouchableOpacity>
-        <Text style={styles.likeCountText}>{(likeCount ?? 0).toString()}</Text>
-      </View>
-    </Pressable>
+      </Pressable>
+    </Animated.View>
   );
 }
 
@@ -214,11 +262,18 @@ const styles = StyleSheet.create({
   usernameHighlighted: { fontWeight: "800" },
   actionsRow: { flexDirection: "row", marginTop: 8 },
   actionBtn: { flexDirection: "row", alignItems: "center", marginRight: 16 },
-  actionText: { marginLeft: 6, color: "#444", fontSize: 13 },
+  actionText: { marginLeft: 0, color: "#444", fontSize: 13 },
   likedText: { color: "#ff3b30" },
   viewReplies: { marginTop: 8 },
-  viewRepliesContainer: { marginTop: 8 },
-  viewRepliesText: { color: "#007AFF", fontSize: 13 },
+  viewRepliesContainer: { marginTop: 6 },
+  viewRepliesRow: { flexDirection: "row", alignItems: "center", marginTop: 2 },
+  viewRepliesLine: {
+    width: 24,
+    height: 2,
+    backgroundColor: "#c7c7c7",
+    marginRight: 8,
+  },
+  viewRepliesText: { color: "#6b7280", fontSize: 13 },
   highlight: {
     backgroundColor: "rgba(0,122,255,0.03)",
     borderLeftWidth: 3,
@@ -235,7 +290,7 @@ const styles = StyleSheet.create({
     width: 40,
     alignItems: "center",
     justifyContent: "flex-start",
-    paddingTop: 4,
+    paddingTop: 2,
   },
   likeBtn: {
     padding: 6,
@@ -245,4 +300,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#666",
   },
+  containerReply: {
+    flexDirection: "row",
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    alignItems: "flex-start",
+  },
+  contentReply: { marginTop: 4 },
+  actionsRowReply: { flexDirection: "row", marginTop: 6 },
 });
