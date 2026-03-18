@@ -1,0 +1,199 @@
+import BackButton from "@/components/BackButton";
+import CommentInput from "@/components/comments/CommentInput";
+import CommentList from "@/components/comments/CommentList";
+import PostCard, { type Post as FeedPost } from "@/components/PostCard";
+import { useAuth } from "@/hooks/useAuth";
+import { ApiError } from "@/services/api";
+import { postService } from "@/services/post.service";
+import { userService, type AppUser } from "@/services/user.service";
+import { Stack, useLocalSearchParams } from "expo-router";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { StyleSheet, Text, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+
+const FALLBACK_POST_IMAGE = "https://placehold.co/1080x1080?text=Post";
+
+export default function SinglePostView() {
+  const params = useLocalSearchParams();
+  const postId = String(params.postId ?? "");
+  const username = String(params.username ?? "");
+  const scrollToCommentId = String(params.scrollToCommentId ?? "");
+  const rootCommentId = String(params.rootCommentId ?? "");
+  console.log("[SinglePost] params:", {
+    postId,
+    scrollToCommentId,
+    rootCommentId,
+  });
+
+  const user = useAuth((s) => s.user);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [notFound, setNotFound] = useState(false);
+  const [post, setPost] = useState<any | null>(null);
+  const [owner, setOwner] = useState<AppUser | null>(null);
+  const commentListRef = useRef<any>(null);
+
+  useEffect(() => {
+    if (!postId) return;
+
+    void (async () => {
+      setLoading(true);
+      setError(null);
+      setNotFound(false);
+
+      try {
+        const res = await postService.getPostById(postId);
+        if (res?.data) setPost(res.data);
+        console.log("[SinglePost] post loaded", res?.data);
+        const uid = res?.data?.userId;
+        if (uid) {
+          try {
+            const userRes = await userService.getUserById(String(uid));
+            if (userRes?.data) setOwner(userRes.data);
+            console.log("[SinglePost] owner loaded", userRes?.data);
+          } catch {}
+        }
+      } catch (e: any) {
+        if (e instanceof ApiError && e.status === 404) {
+          setNotFound(true);
+          setError("Bài viết không tồn tại hoặc đã bị xóa");
+        } else {
+          setError(e?.message ?? String(e) ?? "Không tải được bài viết");
+        }
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [postId]);
+
+  useEffect(() => {
+    if (!postId || !commentListRef) return;
+
+    const tryOpen = (tries = 0) => {
+      const ref = commentListRef.current;
+      console.log("[SinglePost] tryOpen ref", { refPresent: !!ref, tries });
+      if (ref) {
+        if (rootCommentId) {
+          if (typeof ref.openThread === "function") {
+            try {
+              ref.openThread(rootCommentId, scrollToCommentId || undefined);
+              console.log("[SinglePost] called openThread", {
+                rootCommentId,
+                scrollToCommentId,
+              });
+              return;
+            } catch {}
+          }
+        }
+
+        if (scrollToCommentId && typeof ref.scrollToComment === "function") {
+          try {
+            ref.scrollToComment(scrollToCommentId);
+            return;
+          } catch {}
+        }
+      }
+
+      if (tries < 10) setTimeout(() => tryOpen(tries + 1), 200);
+    };
+
+    if (scrollToCommentId || rootCommentId) setTimeout(() => tryOpen(), 200);
+  }, [postId, scrollToCommentId, rootCommentId]);
+
+  const feedPost = useMemo<FeedPost | null>(() => {
+    if (!post) return null;
+
+    const meId = user?._id ?? null;
+    const displayName =
+      post.userDisplayName ??
+      post.userName ??
+      owner?.displayName ??
+      owner?.username ??
+      post.userId ??
+      "Người dùng";
+    const avatarUrl = post.userAvatarUrl ?? owner?.avatarUrl ?? "";
+
+    return {
+      id: post._id,
+      userName: displayName,
+      userAvatar: avatarUrl || FALLBACK_POST_IMAGE,
+      images: post.images?.length ? post.images : [FALLBACK_POST_IMAGE],
+      caption: post.caption ?? "",
+      hashtags: post.hashtags ?? [],
+      likes: post.likeCount ?? 0,
+      createdAt: post.createdAt,
+      musicUrl: post.musicId ?? undefined,
+    };
+  }, [post, user?._id]);
+
+  return (
+    <>
+      <Stack.Screen
+        options={{
+          title:
+            owner?.displayName ??
+            owner?.username ??
+            feedPost?.userName ??
+            "Bài viết",
+        }}
+      />
+
+      <SafeAreaView style={styles.container} edges={["top"]}>
+        <View style={styles.header}>
+          <BackButton href="/(tabs)/notification" />
+          <Text style={styles.title}>
+            {owner?.displayName ??
+              owner?.username ??
+              feedPost?.userName ??
+              "Bài viết"}
+          </Text>
+          <View style={styles.headerSpacer} />
+        </View>
+
+        {loading && !post ? (
+          <Text style={styles.stateText}>Đang tải...</Text>
+        ) : null}
+        {error ? <Text style={styles.stateText}>{String(error)}</Text> : null}
+
+        {feedPost ? (
+          <>
+            <CommentList
+              ref={commentListRef}
+              postId={postId}
+              highlightId={rootCommentId || scrollToCommentId || null}
+              headerComponent={
+                <PostCard
+                  post={feedPost}
+                  isActive={true}
+                  isOwnPost={String(post.userId) === String(user?._id)}
+                  onPressComment={() => {}}
+                />
+              }
+            />
+
+            <CommentInput postId={postId} onCommentAdded={() => {}} />
+          </>
+        ) : null}
+      </SafeAreaView>
+    </>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: "#fff" },
+  header: {
+    height: 52,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "#e5e7eb",
+    backgroundColor: "#fff",
+  },
+  title: { fontSize: 16, fontWeight: "700", color: "#111" },
+  headerSpacer: { width: 36, height: 36 },
+  stateText: { padding: 16, color: "#6b7280" },
+  postWrap: { flex: 1 },
+  comments: { flex: 1 },
+});
