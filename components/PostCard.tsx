@@ -27,6 +27,7 @@ export type Post = {
   caption: string;
   hashtags?: string[] | string;
   likes: number;
+  commentCount?: number;
   createdAt?: string;
   musicUrl?: string;
 };
@@ -189,6 +190,7 @@ export default function PostCard({
   const [isLiking, setIsLiking] = useState(false);
   const effectiveLiked = propLiked ?? localLiked;
   const effectiveLikeCount = propLikeCount ?? localLikeCount;
+  const effectiveCommentCount = (post as any).commentCount ?? 0;
   const accessToken = useAuth((s) => s.accessToken);
 
   useEffect(() => {
@@ -510,13 +512,21 @@ export default function PostCard({
               size={22}
               color={effectiveLiked ? "#E0245E" : "#111"}
             />
+            <Text style={styles.actionCount}>
+              {(effectiveLikeCount ?? 0).toLocaleString()}
+            </Text>
           </TouchableOpacity>
+
           <Pressable
             style={styles.actionButton}
             onPress={onPressComment ?? onPressMessage}
           >
             <Ionicons name="chatbubble-outline" size={22} color="black" />
+            <Text style={styles.actionCount}>
+              {(effectiveCommentCount ?? 0).toLocaleString()}
+            </Text>
           </Pressable>
+
           <Pressable style={styles.actionButton} onPress={onPressMessage}>
             <Ionicons name="paper-plane-outline" size={22} color="black" />
           </Pressable>
@@ -526,9 +536,7 @@ export default function PostCard({
         </Pressable>
       </View>
 
-      <Text style={styles.likesText}>
-        {(effectiveLikeCount ?? 0).toLocaleString()} likes
-      </Text>
+      {/* Likes count is shown inline next to the like button now */}
       <Text style={styles.caption} numberOfLines={2}>
         <Text style={styles.captionUser}>{post.userName} </Text>
         {post.caption}
@@ -678,8 +686,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 12,
   },
+  actionCount: {
+    marginLeft: 6,
+    fontSize: 13,
+    color: "#111",
+    fontWeight: "600",
+  },
   actionButton: {
     padding: 8,
+    flexDirection: "row",
+    alignItems: "center",
   },
   likesText: {
     paddingHorizontal: 12,

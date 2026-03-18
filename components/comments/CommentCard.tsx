@@ -47,7 +47,8 @@ export default function CommentCard({
   isHighlighted,
 }: Props) {
   const username = (comment as any).userId?.username ?? "User";
-  const avatar = (comment as any).userId?.avatar;
+  const owner = (comment as any).userId || {};
+  const avatar = owner?.avatar || owner?.avatarUrl || owner?.avatar?.url;
   const [liked, setLiked] = useState(false);
   const [likeCount, setLikeCount] = useState<number | undefined>(
     (comment as any).likeCount ?? undefined,
