@@ -177,6 +177,7 @@ export default function Home() {
         caption: item.caption ?? "",
         hashtags: item.hashtags ?? [],
         likes: item.likeCount ?? 0,
+        commentCount: item.commentCount ?? 0,
         createdAt: item.createdAt,
         musicUrl: item.musicId ? musicUrlsById[item.musicId] : undefined,
       };

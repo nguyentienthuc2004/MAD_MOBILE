@@ -20,7 +20,9 @@ const NotificationItem: React.FC<Props> = ({ notification, onPress }) => {
   const populatedActors: Array<any> = notification.actors || [];
   const lastActor = notification.lastActor || populatedActors[0];
 
-  // Build ordered list with lastActor first, then other actors (no duplicates)
+  const avatarUri =
+    lastActor?.avatar || lastActor?.avatarUrl || lastActor?.avatar?.url;
+
   const otherActors = populatedActors.filter(
     (a: any) => String(a._id) !== String(lastActor?._id),
   );
@@ -28,7 +30,7 @@ const NotificationItem: React.FC<Props> = ({ notification, onPress }) => {
 
   const namesToShow = (() => {
     if (!ordered || ordered.length === 0) return ["Someone"];
-    // Show up to 2 names explicitly, then show `và X người khác` if more
+
     return ordered.slice(0, 2).map((a: any) => a.username || "Someone");
   })();
 
@@ -65,7 +67,7 @@ const NotificationItem: React.FC<Props> = ({ notification, onPress }) => {
         ]}
       >
         <Image
-          source={{ uri: lastActor?.avatar || undefined }}
+          source={avatarUri ? { uri: avatarUri } : undefined}
           style={styles.avatar}
         />
         <View style={styles.body}>
