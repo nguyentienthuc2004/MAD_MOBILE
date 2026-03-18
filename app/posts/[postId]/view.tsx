@@ -118,9 +118,12 @@ export default function SinglePostView() {
           return false;
         };
 
-        if (rootCommentId) {
-          if (doOpenThread(rootCommentId, scrollToCommentId || undefined))
-            return;
+        if (scrollToCommentId && rootCommentId) {
+          console.log(
+            "[view.tryOpen] both rootCommentId and scrollToCommentId",
+            { rootCommentId, scrollToCommentId },
+          );
+          if (doOpenThread(rootCommentId, scrollToCommentId)) return;
         }
 
         if (scrollToCommentId) {
@@ -151,6 +154,11 @@ export default function SinglePostView() {
               return;
             } catch {}
           }
+        }
+
+        if (rootCommentId) {
+          if (doOpenThread(rootCommentId, scrollToCommentId || undefined))
+            return;
         }
       }
 
@@ -295,7 +303,7 @@ export default function SinglePostView() {
             <CommentList
               ref={commentListRef}
               postId={postId}
-              highlightId={rootCommentId || scrollToCommentId || null}
+              highlightId={scrollToCommentId || rootCommentId || null}
               headerComponent={headerComponent}
               onReplyRequested={handleReplyRequested}
               onEditRequested={handleEditRequested}

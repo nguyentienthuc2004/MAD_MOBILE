@@ -190,6 +190,7 @@ function CommentList(
       const idx = data.findIndex(
         (it) => (it as any).id === commentId || (it as any)._id === commentId,
       );
+
       if (idx >= 0) {
         try {
           flatRef.current?.scrollToIndex({
@@ -223,8 +224,9 @@ function CommentList(
       setExpanded((s) => ({ ...s, [rootId]: true }));
 
       if (scrollToId) {
-        // give FlatList time to render
-        setTimeout(() => {
+        // Retry scrolling until the item is rendered. This handles slower
+        // devices where replies take longer to mount.
+        const tryScroll = (attempt = 0) => {
           const data = buildData();
           const idx = data.findIndex(
             (it) =>
@@ -237,9 +239,34 @@ function CommentList(
                 animated: true,
                 viewPosition: 0.5,
               });
-            } catch {}
+              return true;
+            } catch {
+              return false;
+            }
           }
-        }, 120);
+
+          if (attempt >= 12) return false;
+          setTimeout(() => tryScroll(attempt + 1), 150);
+          return false;
+        };
+
+        const ensureRootLoaded = (attempt = 0) => {
+          const hasRoot = rootComments.some(
+            (r) => (r as any).id === rootId || (r as any)._id === rootId,
+          );
+          if (hasRoot) {
+            setTimeout(() => tryScroll(), 50);
+            return;
+          }
+          if (attempt >= 12) {
+            // final attempt even if root not present
+            setTimeout(() => tryScroll(), 50);
+            return;
+          }
+          setTimeout(() => ensureRootLoaded(attempt + 1), 150);
+        };
+
+        ensureRootLoaded();
       }
     },
   }));

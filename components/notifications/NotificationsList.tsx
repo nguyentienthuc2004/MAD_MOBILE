@@ -52,14 +52,22 @@ const NotificationsList: React.FC = () => {
                 n.data?.post);
             const postId = extractId(rawPost);
 
+            // Prefer explicit reply/comment id in payload (`data.commentId`)
+            // which is the id of the reply. Only fallback to `targetCommentId`
+            // (server uses this for root in some cases) when no explicit id.
             const rawComment =
               n &&
-              (n.targetCommentId ??
-                n.data?.commentId ??
+              (n.data?.commentId ??
+                n.data?.replyId ??
+                n.data?.comment ??
                 n.data?.targetCommentId ??
-                n.data?.comment);
+                n.targetCommentId);
             const commentId = extractId(rawComment);
 
+            // Determine root id: prefer explicit `data.rootCommentId` when provided.
+            // Avoid using `n.targetCommentId` as the root because the backend
+            // sometimes sets `targetCommentId` to the actual comment (reply)
+            // instead of the root, which breaks openThread logic.
             const rawRoot = n && (n.data?.rootCommentId ?? n.data?.rootId);
             const rootId = extractId(rawRoot);
 
