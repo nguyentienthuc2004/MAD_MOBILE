@@ -161,5 +161,14 @@ export const chatService = {
             method: "PATCH",
         });
     },
+
+    deleteMessage(roomId: string, messageId: string) {
+        return apiAuthRequest<ApiEnvelope<unknown>>(
+            `/chat/rooms/${roomId}/messages/${messageId}`,
+            {
+                method: "DELETE",
+            },
+        );
+    },
 };
 
