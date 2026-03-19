@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -27,6 +28,7 @@ type ChatMessage = {
     createdAt: string;
     senderId: string;
     kind?: "normal" | "system";
+    images?: string[];
     replyTo?: {
         id: string;
         content: string;
@@ -68,6 +70,7 @@ export default function ChatRoomScreen() {
     const [loadingMore, setLoadingMore] = useState(false);
     const [hasMore, setHasMore] = useState(true);
     const [oldestCursor, setOldestCursor] = useState<string | null>(null);
+    const [sendingImage, setSendingImage] = useState(false);
 
     const [typingUsers, setTypingUsers] = useState<
         { userId: string; name?: string }[]
@@ -160,6 +163,7 @@ export default function ChatRoomScreen() {
                                 })
                                 : "",
                             kind: "normal",
+                            images: m.images,
                         };
 
                         if (m.replyToMessage) {
@@ -234,6 +238,7 @@ export default function ChatRoomScreen() {
                             })
                             : "",
                         kind: "normal",
+                        images: m.images,
                     };
 
                     if (m.replyToMessage) {
@@ -402,6 +407,7 @@ export default function ChatRoomScreen() {
                     senderId: m.sender_id,
                     createdAt: createdAtText,
                     kind: "normal",
+                    images: m.images,
                     replyTo,
                 };
 
@@ -539,6 +545,40 @@ export default function ChatRoomScreen() {
         }
     };
 
+    const handlePickImage = useCallback(async () => {
+        if (!roomId || sendingImage) return;
+
+        try {
+            setSendingImage(true);
+
+            const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (status !== "granted") {
+                return;
+            }
+
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                allowsMultipleSelection: true,
+                quality: 0.8,
+            });
+
+            if (result.canceled || !result.assets || result.assets.length === 0) {
+                return;
+            }
+
+            const uris = result.assets
+                .map((asset) => asset.uri)
+                .filter((uri): uri is string => !!uri);
+
+            if (uris.length === 0) return;
+
+            shouldAutoScrollRef.current = true;
+            await chatService.sendImage(String(roomId), uris);
+        } finally {
+            setSendingImage(false);
+        }
+    }, [roomId, sendingImage]);
+
     const renderItem = ({ item }: { item: ChatMessage }) => {
         if (item.kind === "system") {
             return (
@@ -601,14 +641,27 @@ export default function ChatRoomScreen() {
                                 </Text>
                             </View>
                         )}
-                        <Text
-                            style={[
-                                styles.messageText,
-                                item.isMine && styles.messageTextMine,
-                            ]}
-                        >
-                            {item.content}
-                        </Text>
+                        {item.images && item.images.length > 0 && (
+                            <View style={styles.messageImagesWrap}>
+                                {item.images.map((url, index) => (
+                                    <Image
+                                        key={`${url}-${index}`}
+                                        source={{ uri: url }}
+                                        style={styles.messageImage}
+                                    />
+                                ))}
+                            </View>
+                        )}
+                        {item.content ? (
+                            <Text
+                                style={[
+                                    styles.messageText,
+                                    item.isMine && styles.messageTextMine,
+                                ]}
+                            >
+                                {item.content}
+                            </Text>
+                        ) : null}
                         {item.createdAt ? (
                             <View style={styles.messageTimeRow}>
                                 <Text
@@ -902,7 +955,7 @@ export default function ChatRoomScreen() {
                         <Pressable
                             style={styles.iconButton}
                             onPress={() => {
-                                // TODO: mở thư viện ảnh để gửi ảnh
+                                void handlePickImage();
                             }}
                         >
                             <Ionicons name="image-outline" size={22} color="#6b7280" />
@@ -1185,6 +1238,16 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontWeight: "600",
         color: "#4b5563",
+    },
+    messageImagesWrap: {
+        marginTop: 4,
+        gap: 4,
+    },
+    messageImage: {
+        width: 180,
+        height: 180,
+        borderRadius: 12,
+        backgroundColor: "#d1d5db",
     },
     messageTimeRow: {
         alignSelf: "flex-start",

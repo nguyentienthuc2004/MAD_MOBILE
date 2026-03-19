@@ -40,6 +40,7 @@ export type MessageDto = {
     room_id: string;
     sender_id: string;
     content: string;
+    images?: string[];
     replyToMessage?: string;
     isDeleted?: boolean;
     createdAt?: string;
@@ -118,6 +119,34 @@ export const chatService = {
                 replyMessageId: options?.replyToMessageId,
             },
         });
+    },
+
+    sendImage(roomId: string, imageUris: string | string[]) {
+        const formData = new FormData();
+
+        const uris = Array.isArray(imageUris) ? imageUris : [imageUris];
+
+        uris.forEach((uri, index) => {
+            formData.append(
+                "images",
+                {
+                    uri,
+                    name: `image-${index + 1}.jpg`,
+                    type: "image/jpeg",
+                } as any,
+            );
+        });
+
+        return apiAuthRequest<SendMessageResponse>(
+            `/chat/rooms/${roomId}/messages/image`,
+            {
+                method: "POST",
+                body: formData,
+                headers: {
+                    "Content-Type": "multipart/form-data",
+                },
+            },
+        );
     },
 
     updateNickname(roomId: string, userId: string, nickname: string) {
