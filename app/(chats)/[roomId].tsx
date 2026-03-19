@@ -27,6 +27,12 @@ type ChatMessage = {
     createdAt: string;
     senderId: string;
     kind?: "normal" | "system";
+    replyTo?: {
+        id: string;
+        content: string;
+        senderId: string;
+        isMine: boolean;
+    };
 };
 
 type NicknameChangedEvent = {
@@ -66,6 +72,8 @@ export default function ChatRoomScreen() {
     const [typingUsers, setTypingUsers] = useState<
         { userId: string; name?: string }[]
     >([]);
+
+    const [replyTarget, setReplyTarget] = useState<ChatMessage | null>(null);
 
     const flatListRef = useRef<FlatList<ChatMessage> | null>(null);
     const shouldAutoScrollRef = useRef<boolean>(true);
@@ -131,21 +139,43 @@ export default function ChatRoomScreen() {
                     setHasMore(false);
                 }
 
+                // Tạo map để dễ tìm tin nhắn gốc khi có replyToMessage
+                const byId = new Map<string, MessageDto>();
+                uniqueMessages.forEach((m) => {
+                    byId.set(m._id, m);
+                });
+
                 const mapped: ChatMessage[] = [...uniqueMessages]
                     .reverse()
-                    .map((m) => ({
-                        id: m._id,
-                        content: m.content,
-                        isMine: meId ? m.sender_id === meId : false,
-                        senderId: m.sender_id,
-                        createdAt: m.createdAt
-                            ? new Date(m.createdAt).toLocaleTimeString("vi-VN", {
-                                hour: "2-digit",
-                                minute: "2-digit",
-                            })
-                            : "",
-                        kind: "normal",
-                    }));
+                    .map((m) => {
+                        const base: ChatMessage = {
+                            id: m._id,
+                            content: m.content,
+                            isMine: meId ? m.sender_id === meId : false,
+                            senderId: m.sender_id,
+                            createdAt: m.createdAt
+                                ? new Date(m.createdAt).toLocaleTimeString("vi-VN", {
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                })
+                                : "",
+                            kind: "normal",
+                        };
+
+                        if (m.replyToMessage) {
+                            const parent = byId.get(m.replyToMessage);
+                            if (parent) {
+                                base.replyTo = {
+                                    id: parent._id,
+                                    content: parent.content,
+                                    senderId: parent.sender_id,
+                                    isMine: meId ? parent.sender_id === meId : false,
+                                };
+                            }
+                        }
+
+                        return base;
+                    });
 
                 setMessages(dedupeMessagesById(mapped));
             } catch {
@@ -184,21 +214,42 @@ export default function ChatRoomScreen() {
                     index === arr.findIndex((m) => m._id === msg._id),
             );
 
+            const byId = new Map<string, MessageDto>();
+            uniqueMessages.forEach((m) => {
+                byId.set(m._id, m);
+            });
+
             const mapped: ChatMessage[] = [...uniqueMessages]
                 .reverse()
-                .map((m) => ({
-                    id: m._id,
-                    content: m.content,
-                    isMine: meId ? m.sender_id === meId : false,
-                    senderId: m.sender_id,
-                    createdAt: m.createdAt
-                        ? new Date(m.createdAt).toLocaleTimeString("vi-VN", {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                        })
-                        : "",
-                    kind: "normal",
-                }));
+                .map((m) => {
+                    const base: ChatMessage = {
+                        id: m._id,
+                        content: m.content,
+                        isMine: meId ? m.sender_id === meId : false,
+                        senderId: m.sender_id,
+                        createdAt: m.createdAt
+                            ? new Date(m.createdAt).toLocaleTimeString("vi-VN", {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                            })
+                            : "",
+                        kind: "normal",
+                    };
+
+                    if (m.replyToMessage) {
+                        const parent = byId.get(m.replyToMessage);
+                        if (parent) {
+                            base.replyTo = {
+                                id: parent._id,
+                                content: parent.content,
+                                senderId: parent.sender_id,
+                                isMine: meId ? parent.sender_id === meId : false,
+                            };
+                        }
+                    }
+
+                    return base;
+                });
 
             setMessages((prev) =>
                 dedupeMessagesById([
@@ -319,25 +370,41 @@ export default function ChatRoomScreen() {
                 messageId: m._id,
             });
 
-            const createdAtText = m.createdAt
-                ? new Date(m.createdAt).toLocaleTimeString("vi-VN", {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                })
-                : "";
-
-            const newMsg: ChatMessage = {
-                id: m._id,
-                content: m.content,
-                isMine: meId ? m.sender_id === meId : false,
-                senderId: m.sender_id,
-                createdAt: createdAtText,
-                kind: "normal",
-            };
-
             setMessages((prev) => {
-                // Tránh thêm trùng tin nhắn nếu đã có
-                if (prev.some((item) => item.id === newMsg.id)) return prev;
+                if (prev.some((item) => item.id === m._id)) return prev;
+
+                const createdAtText = m.createdAt
+                    ? new Date(m.createdAt).toLocaleTimeString("vi-VN", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                    })
+                    : "";
+
+                let replyTo: ChatMessage["replyTo"] | undefined;
+                if (m.replyToMessage) {
+                    const parent = prev.find(
+                        (msg) => String(msg.id) === String(m.replyToMessage),
+                    );
+                    if (parent) {
+                        replyTo = {
+                            id: parent.id,
+                            content: parent.content,
+                            senderId: parent.senderId,
+                            isMine: parent.isMine,
+                        };
+                    }
+                }
+
+                const newMsg: ChatMessage = {
+                    id: m._id,
+                    content: m.content,
+                    isMine: meId ? m.sender_id === meId : false,
+                    senderId: m.sender_id,
+                    createdAt: createdAtText,
+                    kind: "normal",
+                    replyTo,
+                };
+
                 return dedupeMessagesById([...prev, newMsg]);
             });
         };
@@ -451,10 +518,14 @@ export default function ChatRoomScreen() {
             }
             isTypingRef.current = false;
 
+            const replyToMessageId = replyTarget?.id;
+
             // Khi mình gửi tin nhắn thì luôn muốn cuộn xuống cuối
             shouldAutoScrollRef.current = true;
             setSending(true);
-            const res = await chatService.sendMessage(String(roomId), text);
+            const res = await chatService.sendMessage(String(roomId), text, {
+                replyToMessageId,
+            });
             const m = res.data?.message;
             if (!m) return;
 
@@ -462,6 +533,7 @@ export default function ChatRoomScreen() {
             // được gửi lại từ socket SERVER_SEND_MESSAGE. UI sẽ được cập nhật
             // duy nhất bởi sự kiện socket, đảm bảo mỗi tin nhắn chỉ hiển thị một lần.
             setInput("");
+            setReplyTarget(null);
         } finally {
             setSending(false);
         }
@@ -482,58 +554,76 @@ export default function ChatRoomScreen() {
                 : undefined;
 
         return (
-            <View
-                style={[
-                    styles.messageRow,
-                    item.isMine ? styles.messageRowMine : styles.messageRowOther,
-                ]}
+            <Pressable
+                onLongPress={() => setReplyTarget(item)}
+                delayLongPress={250}
             >
-                {!item.isMine && (
-                    <View style={styles.messageAvatarWrap}>
-                        {sender?.avatar ? (
-                            <Image
-                                source={{ uri: sender.avatar }}
-                                style={styles.messageAvatar}
-                            />
-                        ) : (
-                            <View style={styles.messageAvatarFallback}>
-                                <Text style={styles.messageAvatarInitial}>
-                                    {(sender?.nickname || "?")
-                                        .charAt(0)
-                                        .toUpperCase()}
+                <View
+                    style={[
+                        styles.messageRow,
+                        item.isMine ? styles.messageRowMine : styles.messageRowOther,
+                    ]}
+                >
+                    {!item.isMine && (
+                        <View style={styles.messageAvatarWrap}>
+                            {sender?.avatar ? (
+                                <Image
+                                    source={{ uri: sender.avatar }}
+                                    style={styles.messageAvatar}
+                                />
+                            ) : (
+                                <View style={styles.messageAvatarFallback}>
+                                    <Text style={styles.messageAvatarInitial}>
+                                        {(sender?.nickname || "?")
+                                            .charAt(0)
+                                            .toUpperCase()}
+                                    </Text>
+                                </View>
+                            )}
+                        </View>
+                    )}
+                    <View
+                        style={[
+                            styles.messageBubble,
+                            item.isMine
+                                ? styles.messageBubbleMine
+                                : styles.messageBubbleOther,
+                        ]}
+                    >
+                        {item.replyTo && (
+                            <View style={styles.replyPreview}>
+                                <Text style={styles.replyPreviewLabel}>Trả lời</Text>
+                                <Text
+                                    style={styles.replyPreviewContent}
+                                    numberOfLines={1}
+                                >
+                                    {item.replyTo.content}
                                 </Text>
                             </View>
                         )}
+                        <Text
+                            style={[
+                                styles.messageText,
+                                item.isMine && styles.messageTextMine,
+                            ]}
+                        >
+                            {item.content}
+                        </Text>
+                        {item.createdAt ? (
+                            <View style={styles.messageTimeRow}>
+                                <Text
+                                    style={[
+                                        styles.messageTime,
+                                        item.isMine && styles.messageTimeMine,
+                                    ]}
+                                >
+                                    {item.createdAt}
+                                </Text>
+                            </View>
+                        ) : null}
                     </View>
-                )}
-                <View
-                    style={[
-                        styles.messageBubble,
-                        item.isMine ? styles.messageBubbleMine : styles.messageBubbleOther,
-                    ]}
-                >
-                    <Text
-                        style={[
-                            styles.messageText,
-                            item.isMine && styles.messageTextMine,
-                        ]}
-                    >
-                        {item.content}
-                    </Text>
-                    {item.createdAt ? (
-                        <View style={styles.messageTimeRow}>
-                            <Text
-                                style={[
-                                    styles.messageTime,
-                                    item.isMine && styles.messageTimeMine,
-                                ]}
-                            >
-                                {item.createdAt}
-                            </Text>
-                        </View>
-                    ) : null}
                 </View>
-            </View>
+            </Pressable>
         );
     };
 
@@ -776,6 +866,26 @@ export default function ChatRoomScreen() {
                                 ? `${typingUsers[0].name || "Ai đó"} đang nhập...`
                                 : "Nhiều người đang nhập..."}
                         </Text>
+                    </View>
+                )}
+
+                {replyTarget && (
+                    <View style={styles.replyingToRow}>
+                        <View style={styles.replyingToContent}>
+                            <Text style={styles.replyingToLabel}>Đang trả lời</Text>
+                            <Text
+                                style={styles.replyingToText}
+                                numberOfLines={1}
+                            >
+                                {replyTarget.content}
+                            </Text>
+                        </View>
+                        <Pressable
+                            style={styles.replyingToClose}
+                            onPress={() => setReplyTarget(null)}
+                        >
+                            <Ionicons name="close" size={16} color="#6b7280" />
+                        </Pressable>
                     </View>
                 )}
 
@@ -1095,6 +1205,21 @@ const styles = StyleSheet.create({
     messageTimeMine: {
         color: "#d1d5db",
     },
+    replyPreview: {
+        borderLeftWidth: 2,
+        borderLeftColor: "#9ca3af",
+        paddingLeft: 6,
+        marginBottom: 4,
+    },
+    replyPreviewLabel: {
+        fontSize: 11,
+        color: "#6b7280",
+        marginBottom: 2,
+    },
+    replyPreviewContent: {
+        fontSize: 13,
+        color: "#111827",
+    },
     inputRow: {
         flexDirection: "row",
         alignItems: "flex-end",
@@ -1147,5 +1272,31 @@ const styles = StyleSheet.create({
         fontSize: 12,
         color: "#6b7280",
         fontStyle: "italic",
+    },
+    replyingToRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderTopWidth: StyleSheet.hairlineWidth,
+        borderTopColor: "#e5e7eb",
+        backgroundColor: "#f9fafb",
+    },
+    replyingToContent: {
+        flex: 1,
+        marginRight: 8,
+    },
+    replyingToLabel: {
+        fontSize: 11,
+        color: "#6b7280",
+        marginBottom: 2,
+    },
+    replyingToText: {
+        fontSize: 13,
+        color: "#111827",
+    },
+    replyingToClose: {
+        padding: 4,
     },
 });
