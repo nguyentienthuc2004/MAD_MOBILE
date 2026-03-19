@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import * as Clipboard from "expo-clipboard";
 import * as ImagePicker from "expo-image-picker";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -7,12 +8,14 @@ import {
     FlatList,
     Image,
     KeyboardAvoidingView,
+    Modal,
     Platform,
     Pressable,
     RefreshControl,
     StyleSheet,
     Text,
     TextInput,
+    TouchableOpacity,
     View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -29,6 +32,7 @@ type ChatMessage = {
     senderId: string;
     kind?: "normal" | "system";
     images?: string[];
+    isDeleted?: boolean;
     replyTo?: {
         id: string;
         content: string;
@@ -44,6 +48,12 @@ type NicknameChangedEvent = {
     targetId: string;
     targetName: string;
     newNickname: string;
+};
+
+type MessageDeletedEvent = {
+    roomId: string;
+    messageId: string;
+    deletedBy: string;
 };
 
 const dedupeMessagesById = (items: ChatMessage[]): ChatMessage[] => {
@@ -77,6 +87,12 @@ export default function ChatRoomScreen() {
     >([]);
 
     const [replyTarget, setReplyTarget] = useState<ChatMessage | null>(null);
+
+    const [selectedMessage, setSelectedMessage] = useState<ChatMessage | null>(
+        null,
+    );
+    const [actionSheetVisible, setActionSheetVisible] = useState(false);
+    const [deletingMessage, setDeletingMessage] = useState(false);
 
     const flatListRef = useRef<FlatList<ChatMessage> | null>(null);
     const shouldAutoScrollRef = useRef<boolean>(true);
@@ -151,9 +167,10 @@ export default function ChatRoomScreen() {
                 const mapped: ChatMessage[] = [...uniqueMessages]
                     .reverse()
                     .map((m) => {
+                        const isDeleted = !!m.isDeleted;
                         const base: ChatMessage = {
                             id: m._id,
-                            content: m.content,
+                            content: isDeleted ? "Tin nhắn đã xoá" : m.content,
                             isMine: meId ? m.sender_id === meId : false,
                             senderId: m.sender_id,
                             createdAt: m.createdAt
@@ -163,10 +180,11 @@ export default function ChatRoomScreen() {
                                 })
                                 : "",
                             kind: "normal",
-                            images: m.images,
+                            images: isDeleted ? [] : m.images,
+                            isDeleted,
                         };
 
-                        if (m.replyToMessage) {
+                        if (m.replyToMessage && !isDeleted) {
                             const parent = byId.get(m.replyToMessage);
                             if (parent) {
                                 base.replyTo = {
@@ -226,9 +244,10 @@ export default function ChatRoomScreen() {
             const mapped: ChatMessage[] = [...uniqueMessages]
                 .reverse()
                 .map((m) => {
+                    const isDeleted = !!m.isDeleted;
                     const base: ChatMessage = {
                         id: m._id,
-                        content: m.content,
+                        content: isDeleted ? "Tin nhắn đã xoá" : m.content,
                         isMine: meId ? m.sender_id === meId : false,
                         senderId: m.sender_id,
                         createdAt: m.createdAt
@@ -238,10 +257,11 @@ export default function ChatRoomScreen() {
                             })
                             : "",
                         kind: "normal",
-                        images: m.images,
+                        images: isDeleted ? [] : m.images,
+                        isDeleted,
                     };
 
-                    if (m.replyToMessage) {
+                    if (m.replyToMessage && !isDeleted) {
                         const parent = byId.get(m.replyToMessage);
                         if (parent) {
                             base.replyTo = {
@@ -385,8 +405,10 @@ export default function ChatRoomScreen() {
                     })
                     : "";
 
+                const isDeleted = !!m.isDeleted;
+
                 let replyTo: ChatMessage["replyTo"] | undefined;
-                if (m.replyToMessage) {
+                if (m.replyToMessage && !isDeleted) {
                     const parent = prev.find(
                         (msg) => String(msg.id) === String(m.replyToMessage),
                     );
@@ -402,13 +424,14 @@ export default function ChatRoomScreen() {
 
                 const newMsg: ChatMessage = {
                     id: m._id,
-                    content: m.content,
+                    content: isDeleted ? "Tin nhắn đã xoá" : m.content,
                     isMine: meId ? m.sender_id === meId : false,
                     senderId: m.sender_id,
                     createdAt: createdAtText,
                     kind: "normal",
-                    images: m.images,
+                    images: isDeleted ? [] : m.images,
                     replyTo,
+                    isDeleted,
                 };
 
                 return dedupeMessagesById([...prev, newMsg]);
@@ -467,6 +490,58 @@ export default function ChatRoomScreen() {
             }
         };
 
+        const handleMessageDeleted = (payload: MessageDeletedEvent) => {
+            try {
+                if (!payload || String(payload.roomId) !== roomKey) return;
+
+                const deleterId = String(payload.deletedBy);
+                const meIdStr = meId ? String(meId) : null;
+
+                const isMeDeleter = !!meIdStr && meIdStr === deleterId;
+
+                const deleterMember = room?.users?.find(
+                    (u) => String(u.user_id) === deleterId,
+                );
+
+                let content: string;
+                if (isMeDeleter) {
+                    content = "Bạn đã xoá một tin nhắn";
+                } else {
+                    const name = deleterMember?.nickname || "Một thành viên";
+                    content = `${name} đã xoá một tin nhắn`;
+                }
+
+                const systemMsg: ChatMessage = {
+                    id: `deleted-${payload.messageId}-${Date.now()}`,
+                    content,
+                    isMine: false,
+                    senderId: "system",
+                    createdAt: new Date().toLocaleTimeString("vi-VN", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                    }),
+                    kind: "system",
+                };
+
+                setMessages((prev) => {
+                    const updated = prev.map((m) => {
+                        if (String(m.id) !== String(payload.messageId)) return m;
+
+                        return {
+                            ...m,
+                            isDeleted: true,
+                            content: "Tin nhắn đã xoá",
+                            images: [],
+                        };
+                    });
+
+                    return [...updated, systemMsg];
+                });
+            } catch (e) {
+                console.log("[CHAT] SERVER_MESSAGE_DELETED handle error", e);
+            }
+        };
+
         // Tham gia room và lắng nghe sự kiện, gửi kèm userId để backend kiểm tra
         console.log("[CHAT] JOIN_ROOM emit", { roomId: roomKey, userId: meId });
         socket.emit("JOIN_ROOM", { roomId: roomKey, userId: meId });
@@ -475,6 +550,7 @@ export default function ChatRoomScreen() {
         socket.on("SERVER_NICKNAME_CHANGED", handleNicknameChanged);
         socket.on("SERVER_TYPING", handleTyping);
         socket.on("SERVER_STOP_TYPING", handleStopTyping);
+        socket.on("SERVER_MESSAGE_DELETED", handleMessageDeleted);
 
         return () => {
             console.log("[CHAT] Cleanup SERVER_SEND_MESSAGE listener", {
@@ -485,6 +561,7 @@ export default function ChatRoomScreen() {
             socket.off("SERVER_NICKNAME_CHANGED", handleNicknameChanged);
             socket.off("SERVER_TYPING", handleTyping);
             socket.off("SERVER_STOP_TYPING", handleStopTyping);
+            socket.off("SERVER_MESSAGE_DELETED", handleMessageDeleted);
 
             // Khi rời màn chat, gửi stop typing nếu đang ở trạng thái typing
             if (typingTimeoutRef.current) {
@@ -595,7 +672,10 @@ export default function ChatRoomScreen() {
 
         return (
             <Pressable
-                onLongPress={() => setReplyTarget(item)}
+                onLongPress={() => {
+                    setSelectedMessage(item);
+                    setActionSheetVisible(true);
+                }}
                 delayLongPress={250}
             >
                 <View
@@ -1015,6 +1095,101 @@ export default function ChatRoomScreen() {
                     </Pressable>
                 </View>
             </KeyboardAvoidingView>
+
+            <Modal
+                visible={actionSheetVisible}
+                animationType="fade"
+                transparent
+                onRequestClose={() => {
+                    if (!deletingMessage) {
+                        setActionSheetVisible(false);
+                        setSelectedMessage(null);
+                    }
+                }}
+            >
+                <TouchableOpacity
+                    style={styles.actionSheetOverlay}
+                    activeOpacity={1}
+                    onPress={() => {
+                        if (!deletingMessage) {
+                            setActionSheetVisible(false);
+                            setSelectedMessage(null);
+                        }
+                    }}
+                >
+                    <View style={styles.actionSheetContainer}>
+                        {selectedMessage?.content && !selectedMessage?.isDeleted ? (
+                            <Pressable
+                                style={styles.actionSheetOption}
+                                onPress={async () => {
+                                    if (!selectedMessage?.content) return;
+                                    try {
+                                        await Clipboard.setStringAsync(
+                                            selectedMessage.content,
+                                        );
+                                    } finally {
+                                        setActionSheetVisible(false);
+                                        setSelectedMessage(null);
+                                    }
+                                }}
+                            >
+                                <Text style={styles.actionSheetOptionText}>Sao chép</Text>
+                            </Pressable>
+                        ) : null}
+
+                        {selectedMessage && !selectedMessage.isDeleted ? (
+                            <Pressable
+                                style={styles.actionSheetOption}
+                                onPress={() => {
+                                    setReplyTarget(selectedMessage);
+                                    setActionSheetVisible(false);
+                                    // không reset selectedMessage để vẫn biết đang trả lời tin nào nếu cần
+                                }}
+                            >
+                                <Text style={styles.actionSheetOptionText}>Trả lời</Text>
+                            </Pressable>
+                        ) : null}
+
+                        {selectedMessage?.isMine && !selectedMessage?.isDeleted ? (
+                            <Pressable
+                                style={styles.actionSheetOptionDanger}
+                                disabled={deletingMessage}
+                                onPress={async () => {
+                                    if (!roomId || !selectedMessage) return;
+
+                                    try {
+                                        setDeletingMessage(true);
+                                        await chatService.deleteMessage(
+                                            String(roomId),
+                                            selectedMessage.id,
+                                        );
+                                    } finally {
+                                        setDeletingMessage(false);
+                                        setActionSheetVisible(false);
+                                        setSelectedMessage(null);
+                                    }
+                                }}
+                            >
+                                <Text style={styles.actionSheetOptionDangerText}>
+                                    {deletingMessage ? "Đang xoá..." : "Xoá tin nhắn"}
+                                </Text>
+                            </Pressable>
+                        ) : null}
+
+                        <Pressable
+                            style={styles.actionSheetOptionCancel}
+                            onPress={() => {
+                                if (!deletingMessage) {
+                                    setActionSheetVisible(false);
+                                    setSelectedMessage(null);
+                                }
+                            }}
+                        >
+                            <Text style={styles.actionSheetOptionCancelText}>Huỷ</Text>
+                        </Pressable>
+                    </View>
+                </TouchableOpacity>
+            </Modal>
         </SafeAreaView>
     );
 }
@@ -1361,5 +1536,44 @@ const styles = StyleSheet.create({
     },
     replyingToClose: {
         padding: 4,
+    },
+    actionSheetOverlay: {
+        flex: 1,
+        backgroundColor: "rgba(0,0,0,0.3)",
+        justifyContent: "flex-end",
+    },
+    actionSheetContainer: {
+        backgroundColor: "#f9fafb",
+        paddingHorizontal: 16,
+        paddingTop: 8,
+        paddingBottom: 16,
+        borderTopLeftRadius: 16,
+        borderTopRightRadius: 16,
+    },
+    actionSheetOption: {
+        paddingVertical: 12,
+    },
+    actionSheetOptionText: {
+        fontSize: 15,
+        color: "#111827",
+        textAlign: "center",
+    },
+    actionSheetOptionDanger: {
+        paddingVertical: 12,
+    },
+    actionSheetOptionDangerText: {
+        fontSize: 15,
+        color: "#dc2626",
+        textAlign: "center",
+        fontWeight: "600",
+    },
+    actionSheetOptionCancel: {
+        marginTop: 4,
+        paddingVertical: 12,
+    },
+    actionSheetOptionCancelText: {
+        fontSize: 15,
+        color: "#111827",
+        textAlign: "center",
     },
 });
