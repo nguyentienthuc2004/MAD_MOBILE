@@ -40,6 +40,7 @@ export type MessageDto = {
     room_id: string;
     sender_id: string;
     content: string;
+    replyToMessage?: string;
     isDeleted?: boolean;
     createdAt?: string;
     updatedAt?: string;
@@ -105,10 +106,17 @@ export const chatService = {
         );
     },
 
-    sendMessage(roomId: string, content: string) {
+    sendMessage(
+        roomId: string,
+        content: string,
+        options?: { replyToMessageId?: string },
+    ) {
         return apiAuthRequest<SendMessageResponse>(`/chat/rooms/${roomId}/messages`, {
             method: "POST",
-            body: { content },
+            body: {
+                content,
+                replyMessageId: options?.replyToMessageId,
+            },
         });
     },
 
