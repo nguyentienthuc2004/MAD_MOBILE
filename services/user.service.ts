@@ -16,7 +16,7 @@ const getUsers = (): Promise<ApiResponse<AppUser[]>> =>
     method: "GET",
   });
 const getUserById = (userId: string): Promise<ApiResponse<AppUser>> =>
-  apiAuthRequest<ApiResponse<AppUser>>(`/users/${userId}`, {
+  apiAuthRequest<ApiResponse<AppUser>>(`/users/detail/${userId}`, {
     method: "GET",
   });
 export const userService = {
