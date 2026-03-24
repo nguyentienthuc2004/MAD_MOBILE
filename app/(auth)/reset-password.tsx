@@ -1,35 +1,39 @@
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
 import {
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View
+    KeyboardAvoidingView,
+    Platform,
+    Pressable,
+    StyleSheet,
+    Text,
+    TextInput,
+    View,
 } from "react-native";
 import { authService } from "../../services/auth.service";
 
-export default function ForgotPasswordScreen() {
+export default function ResetPasswordScreen() {
   const router = useRouter();
-  const [email, setEmail] = useState("");
+  const params = useLocalSearchParams();
+  const resetToken = String((params as any).resetToken ?? "");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const isValidEmail = (value: string) => /\S+@\S+\.\S+/.test(value);
-
-  const handleSend = async () => {
-    const value = email.trim();
-    if (!value || !isValidEmail(value)) {
-      setError("Email không hợp lệ");
+  const handleReset = async () => {
+    if (newPassword.length < 6) {
+      setError("Mật khẩu phải có ít nhất 6 ký tự");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setError("Mật khẩu nhập lại không khớp");
       return;
     }
     setLoading(true);
     setError(null);
     try {
-      await authService.forgotPassword({ email: value });
-      router.push({ pathname: "/verify-otp", params: { email: value } } as any);
+      await authService.resetPassword({ resetToken, newPassword });
+      router.push({ pathname: "/login" });
     } catch (e: any) {
       setError(e?.message ?? "Lỗi mạng");
     } finally {
@@ -44,13 +48,23 @@ export default function ForgotPasswordScreen() {
     >
       <View style={styles.card}>
         <TextInput
-          placeholder="Email"
-          autoCapitalize="none"
-          keyboardType="email-address"
-          value={email}
+          placeholder="Mật khẩu mới"
+          secureTextEntry
+          value={newPassword}
           onChangeText={(v) => {
             if (error) setError(null);
-            setEmail(v);
+            setNewPassword(v);
+          }}
+          style={styles.input}
+        />
+
+        <TextInput
+          placeholder="Xác nhận mật khẩu"
+          secureTextEntry
+          value={confirmPassword}
+          onChangeText={(v) => {
+            if (error) setError(null);
+            setConfirmPassword(v);
           }}
           style={styles.input}
         />
@@ -59,11 +73,11 @@ export default function ForgotPasswordScreen() {
 
         <Pressable
           style={[styles.button, loading ? styles.buttonDisabled : undefined]}
-          onPress={handleSend}
+          onPress={handleReset}
           disabled={loading}
         >
           <Text style={styles.buttonText}>
-            {loading ? "Đang gửi..." : "Gửi OTP"}
+            {loading ? "Đang xử lý..." : "Đặt lại mật khẩu"}
           </Text>
         </Pressable>
       </View>

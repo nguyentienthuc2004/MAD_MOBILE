@@ -90,4 +90,31 @@ export const authService = {
       method: "GET",
     });
   },
+
+  forgotPassword(payload: { email: string }) {
+    return apiRequest<ApiResponse<null>>("/auth/forgot-password", {
+      method: "POST",
+      body: payload,
+    });
+  },
+
+  verifyOtp(payload: { email: string; otp: string }) {
+    return apiRequest<ApiResponse<{ resetToken?: string }>>(
+      "/auth/verify-otp",
+      {
+        method: "POST",
+        body: payload,
+      },
+    );
+  },
+
+  resetPassword(payload: { resetToken: string; newPassword: string }) {
+    return apiRequest<ApiResponse<{ message?: string }>>(
+      "/auth/reset-password",
+      {
+        method: "POST",
+        body: payload,
+      },
+    );
+  },
 };
