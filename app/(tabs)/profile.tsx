@@ -7,6 +7,7 @@ import { Feather, Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  Alert,
   Dimensions,
   Image,
   Pressable,
@@ -28,6 +29,9 @@ const ProfileScreen = () => {
   const { request, loading, error } = useApi<ApiResponse<ApiPost[]>>();
   const [posts, setPosts] = useState<ApiPost[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [revealedSensitiveByPostId, setRevealedSensitiveByPostId] = useState<
+    Record<string, boolean>
+  >({});
   const logout = useAuth((state) => state.logout);
 
   const fetchPosts = useCallback(async () => {
@@ -42,6 +46,7 @@ const ProfileScreen = () => {
     const res = await request(() => postService.getPostsByUserId(userId));
     if (!res?.data) return;
     setPosts(res.data);
+    setRevealedSensitiveByPostId({});
   }, [request, user?._id]);
 
   useEffect(() => {
@@ -68,6 +73,7 @@ const ProfileScreen = () => {
       images: post.images?.length ? post.images : [FALLBACK_POST_IMAGE],
       caption: post.caption ?? "",
       likes: post.likeCount ?? 0,
+      isSensitive: Boolean(post.isSensitive),
     }));
   }, [posts, user?.avatarUrl, user?.displayName, user?.username]);
 
@@ -76,6 +82,33 @@ const ProfileScreen = () => {
       pathname: "/post-detail",
       params: { postId },
     });
+  };
+
+  const handlePressGridPost = (item: FeedPost) => {
+    const isBlocked = Boolean(item.isSensitive) && !revealedSensitiveByPostId[item.id];
+
+    if (!isBlocked) {
+      handleOpenPost(item.id);
+      return;
+    }
+
+    Alert.alert(
+      "Nội dung nhạy cảm",
+      "Bài viết này có thể chứa hình ảnh không phù hợp với một số người xem. Bạn có muốn tiếp tục không?",
+      [
+        { text: "Hủy", style: "cancel" },
+        {
+          text: "Xem bài viết",
+          onPress: () => {
+            setRevealedSensitiveByPostId((prev) => ({
+              ...prev,
+              [item.id]: true,
+            }));
+            handleOpenPost(item.id);
+          },
+        },
+      ],
+    );
   };
 
   return (
@@ -148,13 +181,23 @@ const ProfileScreen = () => {
             {feedPosts.map((item) => (
               <Pressable
                 key={item.id}
-                onPress={() => handleOpenPost(item.id)}
+                onPress={() => handlePressGridPost(item)}
                 style={styles.gridItem}
               >
                 <Image
                   source={{ uri: item.images[0] }}
+                  blurRadius={
+                    item.isSensitive && !revealedSensitiveByPostId[item.id]
+                      ? 20
+                      : 0
+                  }
                   style={styles.gridImage}
                 />
+                {item.isSensitive && !revealedSensitiveByPostId[item.id] ? (
+                  <View style={styles.sensitiveGridOverlay}>
+                    <Ionicons name="eye-off" size={18} color="#fff" />
+                  </View>
+                ) : null}
               </Pressable>
             ))}
           </View>
@@ -265,10 +308,17 @@ const styles = StyleSheet.create({
   gridItem: {
     width: GRID_ITEM_SIZE,
     height: GRID_ITEM_SIZE,
+    position: "relative",
   },
   gridImage: {
     width: GRID_ITEM_SIZE,
     height: GRID_ITEM_SIZE,
+  },
+  sensitiveGridOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.35)",
+    alignItems: "center",
+    justifyContent: "center",
   },
   stateText: {
     paddingHorizontal: 16,

@@ -11,6 +11,7 @@ export interface Post {
   commentCount: number;
   createdAt: string;
   updatedAt: string;
+  isSensitive: boolean;
 }
 export interface PostRequest {
   caption: string;

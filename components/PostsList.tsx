@@ -12,6 +12,7 @@ type PostsListProps = {
   listHeaderComponent?: ReactElement;
   refreshing?: boolean;
   onRefresh?: () => void | Promise<void>;
+  sensitiveResetKey?: number;
   canFollow?: boolean;
   getIsFollowing?: (post: Post) => boolean;
   onToggleFollow?: (post: Post, nextValue: boolean) => void;
@@ -25,6 +26,7 @@ export default function PostsList({
   listHeaderComponent,
   refreshing = false,
   onRefresh,
+  sensitiveResetKey = 0,
   canFollow,
   getIsFollowing,
   onToggleFollow,
@@ -69,6 +71,7 @@ export default function PostsList({
       renderItem={({ item }) => (
         <PostCard
           post={item}
+          sensitiveResetKey={sensitiveResetKey}
           isActive={item.id === activePostId}
           isFeedMuted={isFeedMuted}
           canFollow={canFollow}

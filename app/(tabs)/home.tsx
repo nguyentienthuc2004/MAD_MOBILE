@@ -77,6 +77,7 @@ export default function Home() {
     {},
   );
   const [refreshing, setRefreshing] = useState(false);
+  const [sensitiveResetKey, setSensitiveResetKey] = useState(0);
   const [followingByUserId, setFollowingByUserId] = useState<
     Record<string, boolean>
   >({});
@@ -147,6 +148,7 @@ export default function Home() {
     setApiPosts(res.posts);
     setUsers(res.users);
     setMusicUrlsById(res.musicUrlsById);
+    setSensitiveResetKey((prev) => prev + 1);
   }, [isAuthenticated, request]);
 
   useEffect(() => {
@@ -180,6 +182,7 @@ export default function Home() {
         commentCount: item.commentCount ?? 0,
         createdAt: item.createdAt,
         musicUrl: item.musicId ? musicUrlsById[item.musicId] : undefined,
+        isSensitive: Boolean(item.isSensitive),
       };
     });
   }, [apiPosts, musicUrlsById, users]);
@@ -273,6 +276,7 @@ export default function Home() {
 
         <PostsList
           posts={feedPosts}
+          sensitiveResetKey={sensitiveResetKey}
           refreshing={refreshing}
           onRefresh={handleRefresh}
           canFollow={Boolean(isAuthenticated && user?._id)}

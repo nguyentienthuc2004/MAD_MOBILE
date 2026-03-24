@@ -137,6 +137,7 @@ export default function PostDetailScreen() {
 			likes: item.likeCount ?? 0,
 			createdAt: item.createdAt,
 			musicUrl: item.musicId ? musicUrlsById[item.musicId] : undefined,
+			isSensitive: Boolean(item.isSensitive),
 			isOwnPost: meId ? item.userId === meId : false,
 		}));
 	}, [musicUrlsById, posts, user?._id, user?.avatarUrl, user?.displayName, user?.username]);
