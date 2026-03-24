@@ -244,6 +244,7 @@ export default function SinglePostView() {
       likes: post.likeCount ?? 0,
       createdAt: post.createdAt,
       musicUrl: post.musicId ?? undefined,
+      isSensitive: Boolean(post.isSensitive),
     };
   }, [post, user?._id, owner]);
 

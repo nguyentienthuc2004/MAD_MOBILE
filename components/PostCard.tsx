@@ -3,6 +3,7 @@ import { useIsFocused } from "@react-navigation/native";
 import { Audio, type AVPlaybackStatus } from "expo-av";
 import React, { useEffect, useRef, useState } from "react";
 import {
+  Alert,
   FlatList,
   Image,
   Modal,
@@ -30,6 +31,7 @@ export type Post = {
   commentCount?: number;
   createdAt?: string;
   musicUrl?: string;
+  isSensitive?: boolean;
 };
 
 const isPlaybackInterruptionError = (error: unknown) => {
@@ -133,6 +135,7 @@ type PostCardMenuAction = {
 
 type PostCardProps = {
   post: Post;
+  sensitiveResetKey?: number;
   liked?: boolean;
   likeCount?: number;
   isActive?: boolean;
@@ -153,6 +156,7 @@ type PostCardProps = {
 
 export default function PostCard({
   post,
+  sensitiveResetKey = 0,
   liked: propLiked,
   likeCount: propLikeCount,
   onToggleLike,
@@ -176,11 +180,13 @@ export default function PostCard({
   const [isMusicLoading, setIsMusicLoading] = useState(false);
   const [isPlayingMusic, setIsPlayingMusic] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [isSensitiveRevealed, setIsSensitiveRevealed] = useState(false);
   const soundRef = useRef<Audio.Sound | null>(null);
   const { width: screenWidth } = useWindowDimensions();
   const imageWidth = screenWidth;
   const postTimeLabel = formatPostTime(post.createdAt);
   const postHashtagLabel = formatHashtagText(post.hashtags);
+  const isSensitiveBlocked = Boolean(post.isSensitive) && !isSensitiveRevealed;
   const isFollowing = controlledIsFollowing ?? internalIsFollowing;
   const postId = (post as any).id ?? (post as any)._id ?? (post as any).postId;
   const [localLiked, setLocalLiked] = useState(false);
@@ -266,6 +272,10 @@ export default function PostCard({
     const safeIndex = Math.min(Math.max(newIndex, 0), maxIndex);
     setCurrentImageIndex(safeIndex);
   };
+
+  useEffect(() => {
+    setIsSensitiveRevealed(false);
+  }, [post.id, sensitiveResetKey]);
 
   useEffect(() => {
     void Audio.setAudioModeAsync({
@@ -415,6 +425,27 @@ export default function PostCard({
     }
   };
 
+  const handleRevealSensitivePost = () => {
+    if (!isSensitiveBlocked) {
+      return;
+    }
+
+    Alert.alert(
+      "Nội dung nhạy cảm",
+      "Bài viết này có thể chứa hình ảnh không phù hợp với một số người xem. Bạn có muốn tiếp tục không?",
+      [
+        {
+          text: "Hủy",
+          style: "cancel",
+        },
+        {
+          text: "Xem bài viết",
+          onPress: () => setIsSensitiveRevealed(true),
+        },
+      ],
+    );
+  };
+
   return (
     <View style={styles.card}>
       <View style={styles.postHeader}>
@@ -457,6 +488,7 @@ export default function PostCard({
           data={post.images}
           horizontal
           pagingEnabled
+          scrollEnabled={!isSensitiveBlocked}
           bounces={false}
           overScrollMode="never"
           showsHorizontalScrollIndicator={false}
@@ -465,10 +497,24 @@ export default function PostCard({
           renderItem={({ item }) => (
             <Image
               source={{ uri: item }}
+              blurRadius={isSensitiveBlocked ? 24 : 0}
               style={[styles.postImage, { width: imageWidth }]}
             />
           )}
         />
+
+        {isSensitiveBlocked ? (
+          <Pressable
+            style={styles.sensitiveOverlay}
+            onPress={handleRevealSensitivePost}
+          >
+            <Ionicons name="eye-off" size={28} color="#fff" />
+            <Text style={styles.sensitiveTitle}>Nội dung nhạy cảm</Text>
+            <Text style={styles.sensitiveDescription}>
+              Chạm để đọc cảnh báo và xem bài viết.
+            </Text>
+          </Pressable>
+        ) : null}
 
         {post.musicUrl ? (
           <Pressable style={styles.musicToggle} onPress={handleOpenMusic}>
@@ -537,17 +583,26 @@ export default function PostCard({
       </View>
 
       {/* Likes count is shown inline next to the like button now */}
-      <Text style={styles.caption} numberOfLines={2}>
-        <Text style={styles.captionUser}>{post.userName} </Text>
-        {post.caption}
-      </Text>
-      {postHashtagLabel ? (
-        <Text style={styles.hashtagText} numberOfLines={1}>
-          {postHashtagLabel}
+      {isSensitiveBlocked ? (
+        <Text style={styles.sensitiveCaptionText}>
+          Nội dung bài viết đang được ẩn để bảo vệ trải nghiệm xem.
         </Text>
       ) : null}
-      {postTimeLabel ? (
-        <Text style={styles.postTimeText}>{postTimeLabel}</Text>
+      {!isSensitiveBlocked ? (
+        <>
+          <Text style={styles.caption} numberOfLines={2}>
+            <Text style={styles.captionUser}>{post.userName} </Text>
+            {post.caption}
+          </Text>
+          {postHashtagLabel ? (
+            <Text style={styles.hashtagText} numberOfLines={1}>
+              {postHashtagLabel}
+            </Text>
+          ) : null}
+          {postTimeLabel ? (
+            <Text style={styles.postTimeText}>{postTimeLabel}</Text>
+          ) : null}
+        </>
       ) : null}
 
       <Modal
@@ -643,6 +698,24 @@ const styles = StyleSheet.create({
   imageContainer: {
     position: "relative",
   },
+  sensitiveOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.62)",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingHorizontal: 22,
+  },
+  sensitiveTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#fff",
+  },
+  sensitiveDescription: {
+    fontSize: 13,
+    textAlign: "center",
+    color: "rgba(255,255,255,0.92)",
+  },
   postImage: {
     aspectRatio: 1,
     backgroundColor: "#f3f4f6",
@@ -712,6 +785,12 @@ const styles = StyleSheet.create({
   },
   captionUser: {
     fontWeight: "600",
+  },
+  sensitiveCaptionText: {
+    paddingHorizontal: 12,
+    paddingTop: 6,
+    fontSize: 13,
+    color: "#6b7280",
   },
   hashtagText: {
     paddingHorizontal: 12,
