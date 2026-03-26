@@ -120,13 +120,7 @@ export default function UserProfileScreen() {
       pathname: "/post-detail",
       params: {
         postId,
-<<<<<<< HEAD
-        userId: targetUserId,
-        displayName,
-        avatarUrl,
-=======
         authorId: targetUserId,
->>>>>>> 7e3f95c04fcc9c94099773e9d1138db8780aefb5
       },
     });
   };

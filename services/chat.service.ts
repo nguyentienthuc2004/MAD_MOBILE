@@ -96,9 +96,18 @@ export const chatService = {
         });
     },
 
-    getMessages(roomId: string, params?: { before?: string }) {
-        const query = params?.before ? `?before=${encodeURIComponent(params.before)}` : "";
-
+    getMessages(roomId: string, params?: { before?: string; keyword?: string }) {
+        let query = "";
+        const queryParams: string[] = [];
+        if (params?.before) {
+            queryParams.push(`before=${encodeURIComponent(params.before)}`);
+        }
+        if (params?.keyword) {
+            queryParams.push(`keyword=${encodeURIComponent(params.keyword)}`);
+        }
+        if (queryParams.length > 0) {
+            query = `?${queryParams.join("&")}`;
+        }
         return apiAuthRequest<GetMessagesResponse>(
             `/chat/rooms/${roomId}/messages${query}`,
             {
