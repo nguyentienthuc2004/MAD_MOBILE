@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { chatService, type MessageDto } from "@/services/chat.service";
 import { socket } from "@/socket/socket";
 import { useAuth } from "@/stores/auth.store";
+import { useChatStore } from "@/stores/chat.store";
 
 export type ChatRoom = {
     id: string;
@@ -22,6 +23,7 @@ export function useChatRooms(_token?: string) {
 
     const meId = useAuth((state) => state.user?._id ?? null);
 
+    const setChatRoomsUnread = useChatStore((s) => s.setRooms);
     const fetchRooms = useCallback(async () => {
         try {
             setLoading(true);
@@ -110,6 +112,7 @@ export function useChatRooms(_token?: string) {
             });
 
             setRooms(mapped);
+            setChatRoomsUnread(mapped);
 
             // Tham gia tất cả room qua socket để nhận SERVER_SEND_MESSAGE
             if (meId) {
@@ -173,12 +176,13 @@ export function useChatRooms(_token?: string) {
 
                 // Đưa room vừa có tin nhắn lên đầu danh sách
                 updated.sort((a, b) => {
-                    // So sánh đơn giản theo updatedAt string (HH:MM), đủ cho cùng 1 ngày
                     if (a.id === roomId && b.id !== roomId) return -1;
                     if (b.id === roomId && a.id !== roomId) return 1;
                     return 0;
                 });
 
+                // Cập nhật tổng số tin nhắn chưa đọc vào store để badge realtime
+                setChatRoomsUnread(updated);
                 return updated;
             });
         };

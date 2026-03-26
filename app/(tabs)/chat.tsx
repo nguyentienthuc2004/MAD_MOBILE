@@ -1,8 +1,10 @@
+import { useAuth } from "@/hooks/useAuth";
 import { useChatRooms } from "@/hooks/useChatRooms";
+import { userService } from "@/services/user.service";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { useRouter } from "expo-router";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
     FlatList,
     Image,
@@ -17,42 +19,38 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import OnlineUsersList from "../../components/OnlineUsersList";
 import { UserAvatar } from "../../components/UserAvatarItem";
 
-const onlineUsers: UserAvatar[] = [
-    {
-        id: "1",
-        name: "Linh",
-        avatar:
-            "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200",
-        isOnline: true,
-    },
-    {
-        id: "2",
-        name: "Minh",
-        avatar:
-            "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200",
-        isOnline: true,
-    },
-    {
-        id: "3",
-        name: "An",
-        avatar:
-            "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=200",
-        isOnline: true,
-    },
-    {
-        id: "4",
-        name: "Trang",
-        avatar:
-            "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=200",
-        isOnline: true,
-    },
-];
-
 export default function ChatTabScreen() {
     const [search, setSearch] = useState("");
     const router = useRouter();
     const { rooms, loading, error, refetch } = useChatRooms();
     const [refreshing, setRefreshing] = useState(false);
+    const user = useAuth((state) => state.user);
+    const [users, setUsers] = useState<any[]>([]);
+
+    // Lấy danh sách user từ API
+    const fetchUsers = useCallback(async () => {
+        try {
+            const res = await userService.getUsers();
+            setUsers(res.data ?? []);
+        } catch {
+            setUsers([]);
+        }
+    }, []);
+
+    useEffect(() => {
+        fetchUsers();
+    }, [fetchUsers]);
+
+    const onlineUsers = useMemo(() => {
+        return users
+            .filter((item) => item._id !== user?._id)
+            .map((item) => ({
+                id: item._id,
+                name: item.displayName || item.username || "Người dùng",
+                avatar: item.avatarUrl,
+                isOnline: item.isOnline,
+            }));
+    }, [user?._id, users]);
 
     const filteredOnlineUsers = useMemo(() => {
         const keyword = search.trim().toLowerCase();
@@ -60,7 +58,29 @@ export default function ChatTabScreen() {
         return onlineUsers.filter((u) =>
             u.name.toLowerCase().includes(keyword)
         );
-    }, [search]);
+    }, [search, onlineUsers]);
+
+    const handleOpenUserByAvatar = async (selectedUser: UserAvatar) => {
+        if (!selectedUser.id) {
+            return;
+        }
+        if (selectedUser.id === user?._id) {
+            void router.push("/(tabs)/profile");
+            return;
+        }
+        try {
+            const res = await import("@/services/chat.service").then(m => m.chatService.createRoom(selectedUser.id));
+            const room = res.data?.room;
+            if (!room) throw new Error("Không nhận được phòng chat");
+            router.push({
+                pathname: "/(chats)/[roomId]",
+                params: { roomId: room._id, name: selectedUser.name },
+            });
+        } catch (error: any) {
+            // eslint-disable-next-line no-alert
+            alert(error?.message || "Không mở được phòng chat");
+        }
+    };
 
     useFocusEffect(
         useCallback(() => {
@@ -72,10 +92,11 @@ export default function ChatTabScreen() {
         try {
             setRefreshing(true);
             await refetch();
+            await fetchUsers();
         } finally {
             setRefreshing(false);
         }
-    }, [refetch]);
+    }, [refetch, fetchUsers]);
 
     return (
         <SafeAreaView style={styles.container} edges={["top"]}>
@@ -102,9 +123,7 @@ export default function ChatTabScreen() {
             <View style={styles.onlineSection}>
                 <OnlineUsersList
                     users={filteredOnlineUsers}
-                    onUserPress={(user) => {
-                        console.log("Open chat with:", user.name);
-                    }}
+                    onUserPress={handleOpenUserByAvatar}
                 />
             </View>
 
