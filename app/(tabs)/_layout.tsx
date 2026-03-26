@@ -1,5 +1,6 @@
 import NotificationBadge from "@/components/notifications/NotificationBadge";
 import { useAuth } from "@/stores/auth.store";
+import { useChatStore } from "@/stores/chat.store";
 import { useNotifications } from "@/stores/notification.store";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
@@ -67,6 +68,21 @@ const TabsLayout = () => {
           // Ẩn tab Chat khỏi thanh tab, nhưng vẫn điều hướng được bằng router
           href: null,
           title: "Chat",
+          tabBarIcon: ({ color, size, focused }) => {
+            const unread = useChatStore((s) => s.unreadCount);
+            return (
+              <View style={styles.iconWrap}>
+                <Ionicons
+                  name={focused ? "chatbubble" : "chatbubble-outline"}
+                  size={focused ? size + 3 : size}
+                  color={color}
+                />
+                {unread > 0 && (
+                  <View style={[styles.badgeWrap, { backgroundColor: "#ff3b30", borderRadius: 8, width: 10, height: 10 }]} pointerEvents="none" />
+                )}
+              </View>
+            );
+          },
         }}
       />
       <Tabs.Screen

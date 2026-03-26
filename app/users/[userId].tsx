@@ -104,6 +104,7 @@ export default function UserProfileScreen() {
       images: post.images?.length ? post.images : [FALLBACK_POST_IMAGE],
       caption: post.caption ?? "",
       likes: post.likeCount ?? 0,
+      isSensitive: Boolean(post.isSensitive),
       createdAt: post.createdAt,
       isSensitive: Boolean(post.isSensitive),
     }));

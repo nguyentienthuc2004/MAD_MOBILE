@@ -17,50 +17,6 @@ import { type UserAvatar } from "../../components/UserAvatarItem";
 const FALLBACK_POST_IMAGE = "https://placehold.co/1080x1080?text=Post";
 const FALLBACK_AVATAR_URL = "https://placehold.co/200x200?text=User";
 
-const onlineUsers: UserAvatar[] = [
-  {
-    id: "1",
-    name: "Linh",
-    avatar:
-      "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200",
-    isOnline: true,
-  },
-  {
-    id: "2",
-    name: "Minh",
-    avatar:
-      "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200",
-    isOnline: true,
-  },
-  {
-    id: "3",
-    name: "An",
-    avatar:
-      "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=200",
-    isOnline: true,
-  },
-  {
-    id: "4",
-    name: "Huy",
-    avatar:
-      "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200",
-    isOnline: true,
-  },
-  {
-    id: "5",
-    name: "Trang",
-    avatar: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=200",
-    isOnline: true,
-  },
-  {
-    id: "6",
-    name: "Nam",
-    avatar:
-      "https://images.unsplash.com/photo-1521119989659-a83eee488004?w=200",
-    isOnline: true,
-  },
-];
-
 export default function Home() {
   const router = useRouter();
   const user = useAuth((state) => state.user);
@@ -187,6 +143,17 @@ export default function Home() {
     });
   }, [apiPosts, musicUrlsById, users]);
 
+  const onlineUsers = useMemo<UserAvatar[]>(() => {
+    return users
+      .filter((item) => item._id !== user?._id)
+      .map((item) => ({
+        id: item._id,
+        name: item.displayName || item.username || "Người dùng",
+        avatar: item.avatarUrl || FALLBACK_AVATAR_URL,
+        isOnline: item.isOnline,
+      }));
+  }, [user?._id, users]);
+
   const handleOpenChatFromPost = async (post: Post) => {
     const receiverId = post.authorId;
 
@@ -216,6 +183,16 @@ export default function Home() {
     void router.push({
       pathname: "/posts/[postId]/comments",
       params: { postId: post.id, username: post.userName },
+    });
+  };
+
+  const handleOpenPostDetail = (post: Post) => {
+    void router.push({
+      pathname: "/post-detail",
+      params: {
+        postId: post.id,
+        authorId: post.authorId ?? "",
+      },
     });
   };
 
@@ -265,6 +242,22 @@ export default function Home() {
     return Boolean(followingByUserId[authorId]);
   };
 
+  const handleOpenUserByAvatar = (selectedUser: UserAvatar) => {
+    if (!selectedUser.id) {
+      return;
+    }
+
+    if (selectedUser.id === user?._id) {
+      void router.push("/(tabs)/profile");
+      return;
+    }
+
+    void router.push({
+      pathname: "/users/[userId]",
+      params: { userId: selectedUser.id },
+    });
+  };
+
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
       <HomeHeader />
@@ -283,13 +276,14 @@ export default function Home() {
           getIsFollowing={getIsFollowing}
           onToggleFollow={handleToggleFollow}
           onPressUser={handleOpenUserProfile}
+          onPressPost={handleOpenPostDetail}
           onPressMessage={handleOpenChatFromPost}
           onPressComment={handleOpenComments}
           listHeaderComponent={
             <View style={styles.onlineSection}>
               <OnlineUsersList
                 users={onlineUsers}
-                onUserPress={(user) => console.log("Open user:", user.name)}
+                onUserPress={handleOpenUserByAvatar}
               />
             </View>
           }

@@ -1,8 +1,10 @@
+import { useChatStore } from "@/stores/chat.store";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 
 export default function HomeHeader() {
+  const unread = useChatStore((s) => s.unreadCount);
   return (
     <View style={styles.header}>
       <View style={styles.logoWrap}>
@@ -18,6 +20,18 @@ export default function HomeHeader() {
         onPress={() => router.push("/(tabs)/chat")}
       >
         <Ionicons name="paper-plane-outline" size={24} color="black" />
+        {unread > 0 && (
+          <View style={{
+            position: "absolute",
+            top: -2,
+            right: -2,
+            backgroundColor: "#ff3b30",
+            borderRadius: 8,
+            width: 10,
+            height: 10,
+            zIndex: 1,
+          }} pointerEvents="none" />
+        )}
       </Pressable>
     </View>
   );

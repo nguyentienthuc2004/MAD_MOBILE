@@ -81,7 +81,10 @@ const ProfileScreen = () => {
   const handleOpenPost = (postId: string) => {
     void router.push({
       pathname: "/post-detail",
-      params: { postId },
+      params: {
+        postId,
+        authorId: user?._id ?? "",
+      },
     });
   };
 
