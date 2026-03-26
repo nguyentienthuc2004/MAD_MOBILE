@@ -276,7 +276,6 @@ export default function Home() {
           getIsFollowing={getIsFollowing}
           onToggleFollow={handleToggleFollow}
           onPressUser={handleOpenUserProfile}
-          onPressPost={handleOpenPostDetail}
           onPressMessage={handleOpenChatFromPost}
           onPressComment={handleOpenComments}
           listHeaderComponent={
