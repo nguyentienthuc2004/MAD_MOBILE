@@ -21,6 +21,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const FALLBACK_POST_IMAGE = "https://placehold.co/1080x1080?text=Post";
+const FALLBACK_AVATAR_URL = "https://placehold.co/200x200?text=User";
 type FeedPostItem = FeedPost & { isOwnPost: boolean };
 
 export default function PostDetailScreen() {
@@ -95,8 +96,9 @@ export default function PostDetailScreen() {
 			}
 		}
 
-		const nextPosts = res.data;
+		const nextPosts = res.data.posts;
 		setPosts(nextPosts);
+		setAuthorProfile(res.data.author);
 
 		const musicIds = Array.from(
 			new Set(
@@ -286,6 +288,27 @@ export default function PostDetailScreen() {
 		]);
 	}, []);
 
+	const handleOpenUserProfile = useCallback(
+		(post: FeedPostItem) => {
+			const targetUserId = post.authorId;
+
+			if (!targetUserId) {
+				return;
+			}
+
+			if (targetUserId === user?._id) {
+				void router.push("/(tabs)/profile");
+				return;
+			}
+
+			void router.push({
+				pathname: "/users/[userId]",
+				params: { userId: targetUserId },
+			});
+		},
+		[router, user?._id],
+	);
+
 	return (
 		<SafeAreaView style={styles.container} edges={["top"]}>
 			<View style={styles.header}>
@@ -324,6 +347,7 @@ export default function PostDetailScreen() {
 							isActive={item.id === activePostId}
 							isFeedMuted={isFeedMuted}
 							isOwnPost={item.isOwnPost}
+							onPressUser={() => handleOpenUserProfile(item)}
 							onToggleFeedMuted={() => setIsFeedMuted((prev) => !prev)}
 							onPressComment={() => handleOpenComments(item)}
 							onPressEditPost={

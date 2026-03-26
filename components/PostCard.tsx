@@ -147,6 +147,7 @@ type PostCardProps = {
   onToggleFeedMuted?: () => void;
   onToggleFollow?: (nextValue: boolean) => void;
   onPressUser?: () => void;
+  onPressPost?: () => void;
   onPressMessage?: () => void;
   onPressComment?: () => void;
   onPressEditPost?: () => void;
@@ -168,6 +169,7 @@ export default function PostCard({
   onToggleFeedMuted,
   onToggleFollow,
   onPressUser,
+  onPressPost,
   onPressMessage,
   onPressComment,
   onPressEditPost,
@@ -181,12 +183,14 @@ export default function PostCard({
   const [isPlayingMusic, setIsPlayingMusic] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isSensitiveRevealed, setIsSensitiveRevealed] = useState(false);
+  const imageListDidDragRef = useRef(false);
   const soundRef = useRef<Audio.Sound | null>(null);
   const { width: screenWidth } = useWindowDimensions();
   const imageWidth = screenWidth;
   const postTimeLabel = formatPostTime(post.createdAt);
   const postHashtagLabel = formatHashtagText(post.hashtags);
   const isSensitiveBlocked = Boolean(post.isSensitive) && !isSensitiveRevealed;
+  const canScrollImages = post.images.length > 1 && !isSensitiveBlocked;
   const isFollowing = controlledIsFollowing ?? internalIsFollowing;
   const postId = (post as any).id ?? (post as any)._id ?? (post as any).postId;
   const [localLiked, setLocalLiked] = useState(false);
@@ -271,6 +275,32 @@ export default function PostCard({
     const maxIndex = Math.max(post.images.length - 1, 0);
     const safeIndex = Math.min(Math.max(newIndex, 0), maxIndex);
     setCurrentImageIndex(safeIndex);
+  };
+
+  const handleImageListTouchStart = () => {
+    imageListDidDragRef.current = false;
+  };
+
+  const handleImageListScrollBeginDrag = () => {
+    imageListDidDragRef.current = true;
+  };
+
+  const handleImageListScrollEndDrag = () => {
+    setTimeout(() => {
+      imageListDidDragRef.current = false;
+    }, 80);
+  };
+
+  const handleImageListTouchEnd = () => {
+    if (!onPressPost || isSensitiveBlocked) {
+      return;
+    }
+
+    if (imageListDidDragRef.current) {
+      return;
+    }
+
+    onPressPost();
   };
 
   useEffect(() => {
@@ -430,6 +460,15 @@ export default function PostCard({
       return;
     }
 
+    const handleConfirm = () => {
+      if (onPressPost) {
+        onPressPost();
+        return;
+      }
+
+      setIsSensitiveRevealed(true);
+    };
+
     Alert.alert(
       "Nội dung nhạy cảm",
       "Bài viết này có thể chứa hình ảnh không phù hợp với một số người xem. Bạn có muốn tiếp tục không?",
@@ -440,7 +479,7 @@ export default function PostCard({
         },
         {
           text: "Xem bài viết",
-          onPress: () => setIsSensitiveRevealed(true),
+          onPress: handleConfirm,
         },
       ],
     );
@@ -488,12 +527,21 @@ export default function PostCard({
           data={post.images}
           horizontal
           pagingEnabled
-          scrollEnabled={!isSensitiveBlocked}
+          scrollEnabled={canScrollImages}
           bounces={false}
           overScrollMode="never"
           showsHorizontalScrollIndicator={false}
           keyExtractor={(_, index) => `${post.id}-${index}`}
-          onMomentumScrollEnd={handleImageScrollEnd}
+          onTouchStart={handleImageListTouchStart}
+          onTouchEnd={handleImageListTouchEnd}
+          onScrollBeginDrag={handleImageListScrollBeginDrag}
+          onScrollEndDrag={handleImageListScrollEndDrag}
+          onMomentumScrollEnd={(event) => {
+            handleImageScrollEnd(event);
+            setTimeout(() => {
+              imageListDidDragRef.current = false;
+            }, 80);
+          }}
           renderItem={({ item }) => (
             <Image
               source={{ uri: item }}
@@ -533,7 +581,11 @@ export default function PostCard({
         ) : null}
       </View>
 
-      <View style={styles.dotsWrap}>
+      <Pressable
+        style={styles.dotsWrap}
+        onPress={onPressPost}
+        disabled={!onPressPost || isSensitiveBlocked}
+      >
         {post.images.map((_, index) => (
           <View
             key={`${post.id}-dot-${index}`}
@@ -543,7 +595,7 @@ export default function PostCard({
             ]}
           />
         ))}
-      </View>
+      </Pressable>
 
       <View style={styles.actionsRow}>
         <View style={styles.leftActions}>
@@ -590,17 +642,23 @@ export default function PostCard({
       ) : null}
       {!isSensitiveBlocked ? (
         <>
-          <Text style={styles.caption} numberOfLines={2}>
-            <Text style={styles.captionUser}>{post.userName} </Text>
-            {post.caption}
-          </Text>
-          {postHashtagLabel ? (
-            <Text style={styles.hashtagText} numberOfLines={1}>
-              {postHashtagLabel}
+          <Pressable onPress={onPressPost} disabled={!onPressPost}>
+            <Text style={styles.caption} numberOfLines={2}>
+              <Text style={styles.captionUser}>{post.userName} </Text>
+              {post.caption}
             </Text>
+          </Pressable>
+          {postHashtagLabel ? (
+            <Pressable onPress={onPressPost} disabled={!onPressPost}>
+              <Text style={styles.hashtagText} numberOfLines={1}>
+                {postHashtagLabel}
+              </Text>
+            </Pressable>
           ) : null}
           {postTimeLabel ? (
-            <Text style={styles.postTimeText}>{postTimeLabel}</Text>
+            <Pressable onPress={onPressPost} disabled={!onPressPost}>
+              <Text style={styles.postTimeText}>{postTimeLabel}</Text>
+            </Pressable>
           ) : null}
         </>
       ) : null}

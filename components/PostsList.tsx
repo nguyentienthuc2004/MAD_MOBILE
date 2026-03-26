@@ -17,6 +17,7 @@ type PostsListProps = {
   getIsFollowing?: (post: Post) => boolean;
   onToggleFollow?: (post: Post, nextValue: boolean) => void;
   onPressUser?: (post: Post) => void;
+  onPressPost?: (post: Post) => void;
   onPressMessage?: (post: Post) => void;
   onPressComment?: (post: Post) => void;
 };
@@ -31,6 +32,7 @@ export default function PostsList({
   getIsFollowing,
   onToggleFollow,
   onPressUser,
+  onPressPost,
   onPressMessage,
   onPressComment: onPressCommentProp,
 }: PostsListProps) {
@@ -82,6 +84,7 @@ export default function PostsList({
               : undefined
           }
           onPressUser={onPressUser ? () => onPressUser(item) : undefined}
+          onPressPost={onPressPost ? () => onPressPost(item) : undefined}
           onToggleFeedMuted={() => setIsFeedMuted((prev) => !prev)}
           onPressMessage={
             onPressMessage ? () => onPressMessage(item) : undefined
