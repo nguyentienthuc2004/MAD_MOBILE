@@ -26,17 +26,21 @@ type FeedPostItem = FeedPost & { isOwnPost: boolean };
 
 export default function PostDetailScreen() {
 	const router = useRouter();
-	const { postId, authorId } = useLocalSearchParams<{
+	const { postId, userId, displayName, avatarUrl } = useLocalSearchParams<{
 		postId?: string;
-		authorId?: string;
+		userId?: string;
+		displayName?: string;
+		avatarUrl?: string;
 	}>();
 	const selectedPostId = typeof postId === "string" ? postId : "";
-	const selectedAuthorId = typeof authorId === "string" ? authorId : "";
+	const targetUserId = typeof userId === "string" ? userId : "";
+	const targetDisplayName = typeof displayName === "string" ? displayName : "";
+	const targetAvatarUrl = typeof avatarUrl === "string" ? avatarUrl : "";
 
 	const user = useAuth((state) => state.user);
 	const { request, loading, error } = useApi<ApiResponse<ApiPost[]>>();
 	const [posts, setPosts] = useState<ApiPost[]>([]);
-	const [authorProfile, setAuthorProfile] = useState<AppUser | null>(null);
+	const [feedOwner, setFeedOwner] = useState<AppUser | null>(null);
 	const [musicUrlsById, setMusicUrlsById] = useState<Record<string, string>>({});
 	const [refreshing, setRefreshing] = useState(false);
 	const [activePostId, setActivePostId] = useState<string | null>(
@@ -59,46 +63,37 @@ export default function PostDetailScreen() {
 	);
 
 	const fetchPosts = useCallback(async () => {
-		const userId = user?._id;
-		let sourceUserId = selectedAuthorId || userId;
+		const meId = user?._id;
+		const ownerId = targetUserId || meId;
 
-		if (selectedPostId) {
-			try {
-				const selectedPostRes = await postService.getPostById(selectedPostId);
-				const selectedPostOwnerId = selectedPostRes?.data?.userId;
-
-				if (selectedPostOwnerId) {
-					sourceUserId = selectedPostOwnerId;
-				}
-			} catch {
-				// Keep fallback sourceUserId when cannot resolve owner by postId.
-			}
-		}
-
-		if (!sourceUserId) {
+		if (!ownerId) {
 			setPosts([]);
-			setAuthorProfile(null);
+			setFeedOwner(null);
 			setMusicUrlsById({});
 			return;
 		}
 
-		const res = await request(async () => {
-			const postsRes = await postService.getPostsByUserId(sourceUserId);
-
-			if (!sourceUserId || sourceUserId === userId) {
-				return { posts: postsRes.data ?? [], author: null as AppUser | null };
-			}
-
-			try {
-				const userRes = await userService.getUserById(sourceUserId);
-				return { posts: postsRes.data ?? [], author: userRes.data };
-			} catch {
-				return { posts: postsRes.data ?? [], author: null as AppUser | null };
-			}
-		});
-
+		const res = await request(() => postService.getPostsByUserId(ownerId));
 		if (!res?.data) {
 			return;
+		}
+
+		if (ownerId === meId) {
+			setFeedOwner(null);
+		} else if (targetDisplayName || targetAvatarUrl) {
+			setFeedOwner({
+				_id: ownerId,
+				displayName: targetDisplayName,
+				username: targetDisplayName,
+				avatarUrl: targetAvatarUrl,
+			} as AppUser);
+		} else {
+			try {
+				const ownerRes = await userService.getUserById(ownerId);
+				setFeedOwner(ownerRes?.data ?? null);
+			} catch {
+				setFeedOwner(null);
+			}
 		}
 
 		const nextPosts = res.data.posts;
@@ -144,7 +139,7 @@ export default function PostDetailScreen() {
 				resolvedMusics.filter(([, musicUrl]) => Boolean(musicUrl)),
 			),
 		);
-	}, [request, selectedAuthorId, selectedPostId, user?._id]);
+	}, [request, targetAvatarUrl, targetDisplayName, targetUserId, user?._id]);
 
 	useEffect(() => {
 		void fetchPosts();
@@ -161,19 +156,22 @@ export default function PostDetailScreen() {
 
 	const feedPosts = useMemo<FeedPostItem[]>(() => {
 		const meId = user?._id ?? null;
-		const isOwnContext = !selectedAuthorId || selectedAuthorId === meId;
-		const displayName = isOwnContext
-			? user?.displayName || user?.username || "Bạn"
-			: authorProfile?.displayName || authorProfile?.username || "Người dùng";
-		const avatarUrl = isOwnContext
-			? user?.avatarUrl || FALLBACK_AVATAR_URL
-			: authorProfile?.avatarUrl || FALLBACK_AVATAR_URL;
+		const resolvedOwnerName =
+			feedOwner?.displayName ||
+			feedOwner?.username ||
+			(targetUserId && targetUserId !== meId
+				? "Người dùng"
+				: user?.displayName || user?.username || "Bạn");
+		const resolvedOwnerAvatar =
+			feedOwner?.avatarUrl ||
+			(targetUserId && targetUserId !== meId
+				? FALLBACK_POST_IMAGE
+				: user?.avatarUrl || FALLBACK_POST_IMAGE);
 
 		return posts.map((item) => ({
 			id: item._id,
-			authorId: item.userId,
-			userName: displayName,
-			userAvatar: avatarUrl,
+			userName: resolvedOwnerName,
+			userAvatar: resolvedOwnerAvatar,
 			images: item.images?.length ? item.images : [FALLBACK_POST_IMAGE],
 			caption: item.caption ?? "",
 			hashtags: item.hashtags ?? [],
@@ -183,18 +181,7 @@ export default function PostDetailScreen() {
 			isSensitive: Boolean(item.isSensitive),
 			isOwnPost: meId ? item.userId === meId : false,
 		}));
-	}, [
-		authorProfile?.avatarUrl,
-		authorProfile?.displayName,
-		authorProfile?.username,
-		musicUrlsById,
-		posts,
-		selectedAuthorId,
-		user?._id,
-		user?.avatarUrl,
-		user?.displayName,
-		user?.username,
-	]);
+	}, [feedOwner?.avatarUrl, feedOwner?.displayName, feedOwner?.username, musicUrlsById, posts, targetUserId, user?._id, user?.avatarUrl, user?.displayName, user?.username]);
 
 	const postById = useMemo(
 		() => new Map(posts.map((item) => [item._id, item])),

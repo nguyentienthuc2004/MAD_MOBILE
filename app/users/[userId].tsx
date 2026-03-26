@@ -106,6 +106,7 @@ export default function UserProfileScreen() {
       likes: post.likeCount ?? 0,
       isSensitive: Boolean(post.isSensitive),
       createdAt: post.createdAt,
+      isSensitive: Boolean(post.isSensitive),
     }));
   }, [posts, profileUser?.avatarUrl, profileUser?.displayName, profileUser?.username]);
 
@@ -119,7 +120,13 @@ export default function UserProfileScreen() {
       pathname: "/post-detail",
       params: {
         postId,
+<<<<<<< HEAD
+        userId: targetUserId,
+        displayName,
+        avatarUrl,
+=======
         authorId: targetUserId,
+>>>>>>> 7e3f95c04fcc9c94099773e9d1138db8780aefb5
       },
     });
   };
