@@ -43,6 +43,7 @@ const ProfileScreen = () => {
     }
 
     console.log("Fetching posts for userId:", userId);
+    console.log("Using API endpoint:", `/users/${userId}`);
     const res = await request(() => postService.getPostsByUserId(userId));
     if (!res?.data) return;
     setPosts(res.data);
