@@ -4,6 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { ApiError, ApiResponse } from "@/services/api";
 import { musicService } from "@/services/music.service";
 import { Post as ApiPost, postService } from "@/services/post.service";
+import { type AppUser, userService } from "@/services/user.service";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -20,16 +21,22 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const FALLBACK_POST_IMAGE = "https://placehold.co/1080x1080?text=Post";
+const FALLBACK_AVATAR_URL = "https://placehold.co/200x200?text=User";
 type FeedPostItem = FeedPost & { isOwnPost: boolean };
 
 export default function PostDetailScreen() {
 	const router = useRouter();
-	const { postId } = useLocalSearchParams<{ postId?: string }>();
+	const { postId, authorId } = useLocalSearchParams<{
+		postId?: string;
+		authorId?: string;
+	}>();
 	const selectedPostId = typeof postId === "string" ? postId : "";
+	const selectedAuthorId = typeof authorId === "string" ? authorId : "";
 
 	const user = useAuth((state) => state.user);
 	const { request, loading, error } = useApi<ApiResponse<ApiPost[]>>();
 	const [posts, setPosts] = useState<ApiPost[]>([]);
+	const [authorProfile, setAuthorProfile] = useState<AppUser | null>(null);
 	const [musicUrlsById, setMusicUrlsById] = useState<Record<string, string>>({});
 	const [refreshing, setRefreshing] = useState(false);
 	const [activePostId, setActivePostId] = useState<string | null>(
@@ -53,20 +60,50 @@ export default function PostDetailScreen() {
 
 	const fetchPosts = useCallback(async () => {
 		const userId = user?._id;
+		let sourceUserId = selectedAuthorId || userId;
 
-		if (!userId) {
+		if (selectedPostId) {
+			try {
+				const selectedPostRes = await postService.getPostById(selectedPostId);
+				const selectedPostOwnerId = selectedPostRes?.data?.userId;
+
+				if (selectedPostOwnerId) {
+					sourceUserId = selectedPostOwnerId;
+				}
+			} catch {
+				// Keep fallback sourceUserId when cannot resolve owner by postId.
+			}
+		}
+
+		if (!sourceUserId) {
 			setPosts([]);
+			setAuthorProfile(null);
 			setMusicUrlsById({});
 			return;
 		}
 
-		const res = await request(() => postService.getPostsByUserId(userId));
+		const res = await request(async () => {
+			const postsRes = await postService.getPostsByUserId(sourceUserId);
+
+			if (!sourceUserId || sourceUserId === userId) {
+				return { posts: postsRes.data ?? [], author: null as AppUser | null };
+			}
+
+			try {
+				const userRes = await userService.getUserById(sourceUserId);
+				return { posts: postsRes.data ?? [], author: userRes.data };
+			} catch {
+				return { posts: postsRes.data ?? [], author: null as AppUser | null };
+			}
+		});
+
 		if (!res?.data) {
 			return;
 		}
 
-		const nextPosts = res.data;
+		const nextPosts = res.data.posts;
 		setPosts(nextPosts);
+		setAuthorProfile(res.data.author);
 
 		const musicIds = Array.from(
 			new Set(
@@ -107,7 +144,7 @@ export default function PostDetailScreen() {
 				resolvedMusics.filter(([, musicUrl]) => Boolean(musicUrl)),
 			),
 		);
-	}, [request, user?._id]);
+	}, [request, selectedAuthorId, selectedPostId, user?._id]);
 
 	useEffect(() => {
 		void fetchPosts();
@@ -124,11 +161,17 @@ export default function PostDetailScreen() {
 
 	const feedPosts = useMemo<FeedPostItem[]>(() => {
 		const meId = user?._id ?? null;
-		const displayName = user?.displayName || user?.username || "Bạn";
-		const avatarUrl = user?.avatarUrl || FALLBACK_POST_IMAGE;
+		const isOwnContext = !selectedAuthorId || selectedAuthorId === meId;
+		const displayName = isOwnContext
+			? user?.displayName || user?.username || "Bạn"
+			: authorProfile?.displayName || authorProfile?.username || "Người dùng";
+		const avatarUrl = isOwnContext
+			? user?.avatarUrl || FALLBACK_AVATAR_URL
+			: authorProfile?.avatarUrl || FALLBACK_AVATAR_URL;
 
 		return posts.map((item) => ({
 			id: item._id,
+			authorId: item.userId,
 			userName: displayName,
 			userAvatar: avatarUrl,
 			images: item.images?.length ? item.images : [FALLBACK_POST_IMAGE],
@@ -140,7 +183,18 @@ export default function PostDetailScreen() {
 			isSensitive: Boolean(item.isSensitive),
 			isOwnPost: meId ? item.userId === meId : false,
 		}));
-	}, [musicUrlsById, posts, user?._id, user?.avatarUrl, user?.displayName, user?.username]);
+	}, [
+		authorProfile?.avatarUrl,
+		authorProfile?.displayName,
+		authorProfile?.username,
+		musicUrlsById,
+		posts,
+		selectedAuthorId,
+		user?._id,
+		user?.avatarUrl,
+		user?.displayName,
+		user?.username,
+	]);
 
 	const postById = useMemo(
 		() => new Map(posts.map((item) => [item._id, item])),
@@ -247,6 +301,27 @@ export default function PostDetailScreen() {
 		]);
 	}, []);
 
+	const handleOpenUserProfile = useCallback(
+		(post: FeedPostItem) => {
+			const targetUserId = post.authorId;
+
+			if (!targetUserId) {
+				return;
+			}
+
+			if (targetUserId === user?._id) {
+				void router.push("/(tabs)/profile");
+				return;
+			}
+
+			void router.push({
+				pathname: "/users/[userId]",
+				params: { userId: targetUserId },
+			});
+		},
+		[router, user?._id],
+	);
+
 	return (
 		<SafeAreaView style={styles.container} edges={["top"]}>
 			<View style={styles.header}>
@@ -285,6 +360,7 @@ export default function PostDetailScreen() {
 							isActive={item.id === activePostId}
 							isFeedMuted={isFeedMuted}
 							isOwnPost={item.isOwnPost}
+							onPressUser={() => handleOpenUserProfile(item)}
 							onToggleFeedMuted={() => setIsFeedMuted((prev) => !prev)}
 							onPressComment={() => handleOpenComments(item)}
 							onPressEditPost={
