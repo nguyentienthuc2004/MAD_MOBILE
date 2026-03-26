@@ -34,6 +34,7 @@ export default function PostDetailScreen() {
 		avatarUrl?: string;
 	}>();
 	const selectedPostId = typeof postId === "string" ? postId : "";
+
 		const targetUserId =
 			typeof userId === "string"
 				? userId
@@ -70,6 +71,7 @@ export default function PostDetailScreen() {
 
 	const fetchPosts = useCallback(async () => {
 		const meId = user?._id;
+
 		let ownerId = targetUserId;
 
 		if (!ownerId && selectedPostId) {
@@ -160,7 +162,9 @@ export default function PostDetailScreen() {
 				resolvedMusics.filter(([, musicUrl]) => Boolean(musicUrl)),
 			),
 		);
+
 	}, [request, selectedPostId, targetAvatarUrl, targetDisplayName, targetUserId, user?._id]);
+
 
 	useEffect(() => {
 		void fetchPosts();
@@ -186,12 +190,14 @@ export default function PostDetailScreen() {
 		const resolvedOwnerAvatar =
 			feedOwner?.avatarUrl ||
 			(targetUserId && targetUserId !== meId
+
 				? targetAvatarUrl || FALLBACK_AVATAR_URL
 				: user?.avatarUrl || FALLBACK_AVATAR_URL);
 
 		return posts.map((item) => ({
 			id: item._id,
 			authorId: item.userId,
+
 			userName: resolvedOwnerName,
 			userAvatar: resolvedOwnerAvatar,
 			images: item.images?.length ? item.images : [FALLBACK_POST_IMAGE],
@@ -203,6 +209,7 @@ export default function PostDetailScreen() {
 			isSensitive: Boolean(item.isSensitive),
 			isOwnPost: meId ? item.userId === meId : false,
 		}));
+
 	}, [
 		feedOwner?.avatarUrl,
 		feedOwner?.displayName,
@@ -216,6 +223,7 @@ export default function PostDetailScreen() {
 		user?.displayName,
 		user?.username,
 	]);
+
 
 	const postById = useMemo(
 		() => new Map(posts.map((item) => [item._id, item])),

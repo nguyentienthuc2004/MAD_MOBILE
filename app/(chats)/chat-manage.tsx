@@ -146,8 +146,8 @@ export default function ChatManageScreen() {
                 <Pressable
                     style={styles.row}
                     onPress={() => {
-                        setSearchKeyword("");
-                        setShowSearchModal(true);
+                        if (!roomId) return;
+                        router.push(`/(chats)/search-messages?roomId=${roomId}`);
                     }}
                 >
                     <View style={styles.rowLeft}>
