@@ -161,6 +161,25 @@ export default function ChatManageScreen() {
                     </View>
                     <Ionicons name="chevron-forward" size={18} color="#9ca3af" />
                 </Pressable>
+
+                <Pressable
+                    style={styles.row}
+                    onPress={() => {
+                        if (!roomId) return;
+                        router.push({ pathname: "/(chats)/group-members", params: { roomId: String(roomId) } });
+                    }}
+                >
+                    <View style={styles.rowLeft}>
+                        <Ionicons
+                            name="people"
+                            size={20}
+                            color="#6366f1"
+                            style={styles.rowIcon}
+                        />
+                        <Text style={styles.rowTitle}>Thành viên nhóm & đổi quyền</Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={18} color="#9ca3af" />
+                </Pressable>
             </View>
 
             <View style={styles.section}>
