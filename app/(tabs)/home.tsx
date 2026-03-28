@@ -1,6 +1,7 @@
 import { useApi } from "@/hooks/useApi";
 import { useAuth } from "@/hooks/useAuth";
 import { chatService } from "@/services/chat.service";
+import { followService } from "@/services/follow.service";
 import { musicService } from "@/services/music.service";
 import { type Post as ApiPost, postService } from "@/services/post.service";
 import { type AppUser, userService } from "@/services/user.service";
@@ -34,22 +35,25 @@ export default function Home() {
   );
   const [refreshing, setRefreshing] = useState(false);
   const [sensitiveResetKey, setSensitiveResetKey] = useState(0);
-  const [followingByUserId, setFollowingByUserId] = useState<
-    Record<string, boolean>
-  >({});
+  const [followingByUserId, setFollowingByUserId] = useState<Record<string, boolean>>({});
+  const [followIds, setFollowIds] = useState<Set<string>>(new Set());
 
   const fetchFeed = useCallback(async () => {
-    if (!isAuthenticated) {
+    if (!isAuthenticated || !user?._id) {
       setApiPosts([]);
       setUsers([]);
       setMusicUrlsById({});
+      setFollowIds(new Set());
       return;
     }
 
+    let followSet: Set<string> = new Set();
     const res = await request(async () => {
-      const [postsRes, usersRes] = await Promise.all([
+      const [postsRes, usersRes, followersRes, followingRes] = await Promise.all([
         postService.getPostsNotMe(),
         userService.getUsers(),
+        followService.getFollowers(user._id),
+        followService.getFollowing(user._id),
       ]);
 
       const posts = postsRes.data ?? [];
@@ -90,6 +94,11 @@ export default function Home() {
         );
       }
 
+      // Lấy danh sách userId của followers và following
+      const followerIds = (followersRes.data ?? []).map((u) => u._id);
+      const followingIds = (followingRes.data ?? []).map((u) => u._id);
+      followSet = new Set([...followerIds, ...followingIds]);
+
       return {
         posts,
         users: usersRes.data ?? [],
@@ -104,8 +113,9 @@ export default function Home() {
     setApiPosts(res.posts);
     setUsers(res.users);
     setMusicUrlsById(res.musicUrlsById);
+    setFollowIds(followSet);
     setSensitiveResetKey((prev) => prev + 1);
-  }, [isAuthenticated, request]);
+  }, [isAuthenticated, request, user?._id]);
 
   useEffect(() => {
     void fetchFeed();
@@ -145,14 +155,16 @@ export default function Home() {
 
   const onlineUsers = useMemo<UserAvatar[]>(() => {
     return users
-      .filter((item) => item._id !== user?._id)
+      .filter((item) =>
+        item._id !== user?._id && followIds.has(item._id)
+      )
       .map((item) => ({
         id: item._id,
         name: item.displayName || item.username || "Người dùng",
         avatar: item.avatarUrl || FALLBACK_AVATAR_URL,
         isOnline: item.isOnline,
       }));
-  }, [user?._id, users]);
+  }, [user?._id, users, followIds]);
 
   const handleOpenChatFromPost = async (post: Post) => {
     const receiverId = post.authorId;
@@ -234,12 +246,8 @@ export default function Home() {
 
   const getIsFollowing = (post: Post) => {
     const authorId = post.authorId;
-
-    if (!authorId) {
-      return false;
-    }
-
-    return Boolean(followingByUserId[authorId]);
+    if (!authorId) return false;
+    return followIds.has(authorId);
   };
 
   const handleOpenUserByAvatar = (selectedUser: UserAvatar) => {

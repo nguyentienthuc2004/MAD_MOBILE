@@ -2,6 +2,8 @@ import { type Post as FeedPost } from "@/components/PostCard";
 import { useApi } from "@/hooks/useApi";
 import { useAuth } from "@/hooks/useAuth";
 import { chatService } from "@/services/chat.service";
+import { checkFollowStatus } from "@/services/checkFollowStatus";
+import { followService } from "@/services/follow.service";
 import { type Post as ApiPost, postService } from "@/services/post.service";
 import { type AppUser, userService } from "@/services/user.service";
 import { Ionicons } from "@expo/vector-icons";
@@ -29,6 +31,7 @@ export default function UserProfileScreen() {
   const router = useRouter();
   const { userId } = useLocalSearchParams<{ userId?: string }>();
   const targetUserId = typeof userId === "string" ? userId : "";
+  console.log("[UserProfileScreen] params.userId:", userId, "targetUserId:", targetUserId);
 
   const me = useAuth((state) => state.user);
   const isAuthenticated = useAuth((state) => state.isAuthenticated);
@@ -46,6 +49,7 @@ export default function UserProfileScreen() {
   >({});
 
   const fetchUserProfile = useCallback(async () => {
+
     if (!targetUserId) {
       setProfileUser(null);
       setPosts([]);
@@ -57,6 +61,7 @@ export default function UserProfileScreen() {
       return;
     }
 
+    console.log("[UserProfileScreen] Fetching profile for:", targetUserId);
     const res = await request(async () => {
       const [userRes, postsRes] = await Promise.all([
         userService.getUserById(targetUserId),
@@ -81,6 +86,26 @@ export default function UserProfileScreen() {
   useEffect(() => {
     void fetchUserProfile();
   }, [fetchUserProfile]);
+
+  // Kiểm tra trạng thái follow khi vào trang cá nhân
+  useEffect(() => {
+    const check = async () => {
+      if (!me?._id || !targetUserId || me._id === targetUserId) {
+        setIsFollowing(false);
+        console.log("[FollowStatus] Skip check: me?._id:", me?._id, "targetUserId:", targetUserId);
+        return;
+      }
+      try {
+        const res = await checkFollowStatus(targetUserId);
+        console.log("[FollowStatus] API response:", res);
+        setIsFollowing(!!res.isFollowing);
+      } catch (err) {
+        setIsFollowing(false);
+        console.log("[FollowStatus] Error:", err);
+      }
+    };
+    check();
+  }, [me?._id, targetUserId]);
 
   const handleRefresh = useCallback(async () => {
     try {
@@ -154,13 +179,44 @@ export default function UserProfileScreen() {
     );
   };
 
-  const handleToggleFollow = () => {
+  const handleToggleFollow = async () => {
     if (!isAuthenticated || !me?._id) {
       Alert.alert("Thông báo", "Vui lòng đăng nhập để theo dõi.");
       return;
     }
 
-    setIsFollowing((prev) => !prev);
+    if (!isFollowing) {
+      // Đang chưa follow, gọi API tạo follow
+      try {
+        await followService.followUser(targetUserId);
+        setIsFollowing(true);
+        Alert.alert("Thành công", "Bạn đã theo dõi người này.");
+      } catch (err: any) {
+        Alert.alert("Lỗi", err?.message || "Không thể theo dõi.");
+      }
+    } else {
+      // Đang theo dõi, xác nhận hủy theo dõi
+      Alert.alert(
+        "Xác nhận",
+        "Bạn có chắc muốn hủy theo dõi người này?",
+        [
+          { text: "Hủy", style: "cancel" },
+          {
+            text: "Hủy theo dõi",
+            style: "destructive",
+            onPress: async () => {
+              try {
+                await followService.unfollowUser(targetUserId);
+                setIsFollowing(false);
+                Alert.alert("Đã hủy theo dõi", "Bạn đã hủy theo dõi người này.");
+              } catch (err: any) {
+                Alert.alert("Lỗi", err?.message || "Không thể hủy theo dõi.");
+              }
+            },
+          },
+        ]
+      );
+    }
   };
 
   const handleOpenMessage = async () => {
