@@ -1,5 +1,6 @@
 import { useAuth } from "@/hooks/useAuth";
 import { useChatRooms } from "@/hooks/useChatRooms";
+import { followService } from "@/services/follow.service";
 import { userService } from "@/services/user.service";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
@@ -26,31 +27,45 @@ export default function ChatTabScreen() {
     const [refreshing, setRefreshing] = useState(false);
     const user = useAuth((state) => state.user);
     const [users, setUsers] = useState<any[]>([]);
+    const [followIds, setFollowIds] = useState<Set<string>>(new Set());
 
-    // Lấy danh sách user từ API
-    const fetchUsers = useCallback(async () => {
+    // Lấy danh sách user và follow từ API
+    const fetchUsersAndFollows = useCallback(async () => {
+        if (!user?._id) {
+            setUsers([]);
+            setFollowIds(new Set());
+            return;
+        }
         try {
-            const res = await userService.getUsers();
-            setUsers(res.data ?? []);
+            const [usersRes, followersRes, followingRes] = await Promise.all([
+                userService.getUsers(),
+                followService.getFollowers(user._id),
+                followService.getFollowing(user._id),
+            ]);
+            setUsers(usersRes.data ?? []);
+            const followerIds = (followersRes.data ?? []).map((u: any) => u._id);
+            const followingIds = (followingRes.data ?? []).map((u: any) => u._id);
+            setFollowIds(new Set([...followerIds, ...followingIds]));
         } catch {
             setUsers([]);
+            setFollowIds(new Set());
         }
-    }, []);
+    }, [user?._id]);
 
     useEffect(() => {
-        fetchUsers();
-    }, [fetchUsers]);
+        fetchUsersAndFollows();
+    }, [fetchUsersAndFollows]);
 
     const onlineUsers = useMemo(() => {
         return users
-            .filter((item) => item._id !== user?._id)
+            .filter((item) => item._id !== user?._id && followIds.has(item._id))
             .map((item) => ({
                 id: item._id,
                 name: item.displayName || item.username || "Người dùng",
                 avatar: item.avatarUrl,
                 isOnline: item.isOnline,
             }));
-    }, [user?._id, users]);
+    }, [user?._id, users, followIds]);
 
     const filteredOnlineUsers = useMemo(() => {
         const keyword = search.trim().toLowerCase();
@@ -92,11 +107,11 @@ export default function ChatTabScreen() {
         try {
             setRefreshing(true);
             await refetch();
-            await fetchUsers();
+            await fetchUsersAndFollows();
         } finally {
             setRefreshing(false);
         }
-    }, [refetch, fetchUsers]);
+    }, [refetch, fetchUsersAndFollows]);
 
     return (
         <SafeAreaView style={styles.container} edges={["top"]}>
