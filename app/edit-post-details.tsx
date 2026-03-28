@@ -155,7 +155,7 @@ export default function EditPostDetailsScreen() {
       caption: caption.trim(),
       hashtags: hashtagList,
       musicId: selectedMusicId,
-      images: selectedImageUris,
+      existingImages: selectedImageUris,
     }),
     [caption, hashtagList, selectedImageUris, selectedMusicId],
   );

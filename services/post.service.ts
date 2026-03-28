@@ -23,7 +23,7 @@ export interface PostRequest {
 export interface EditPostRequest {
   caption: string;
   hashtags: string[];
-  images: string[];
+  existingImages: string[];
   musicId?: string | null;
 }
 
@@ -89,7 +89,7 @@ const buildEditPostFormData = (data: EditPostRequest) => {
     formData.append("musicId", data.musicId ?? "null");
   }
 
-  const safeImages = Array.from(new Set((data.images ?? []).filter(Boolean)));
+  const safeImages = Array.from(new Set((data.existingImages ?? []).filter(Boolean)));
   const existingImages = safeImages.filter(isRemoteImage);
   const newLocalImages = safeImages.filter((uri) => !isRemoteImage(uri));
 
