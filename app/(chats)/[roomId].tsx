@@ -780,7 +780,10 @@ export default function ChatRoomScreen() {
     return (
         <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
             <View style={styles.header}>
-                <Pressable style={styles.backButton} onPress={() => router.back()}>
+                <Pressable
+                    style={styles.backButton}
+                    onPress={() => router.replace("/(tabs)/chat")}
+                >
                     <Ionicons name="chevron-back" size={24} color="#111" />
                 </Pressable>
                 <Pressable
