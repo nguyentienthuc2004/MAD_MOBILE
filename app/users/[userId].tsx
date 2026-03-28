@@ -43,6 +43,8 @@ export default function UserProfileScreen() {
   const [profileUser, setProfileUser] = useState<AppUser | null>(null);
   const [posts, setPosts] = useState<ApiPost[]>([]);
   const [isFollowing, setIsFollowing] = useState(false);
+  const [followerCount, setFollowerCount] = useState<number | null>(null);
+  const [followingCount, setFollowingCount] = useState<number | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [revealedSensitiveByPostId, setRevealedSensitiveByPostId] = useState<
     Record<string, boolean>
@@ -81,6 +83,8 @@ export default function UserProfileScreen() {
     setProfileUser(res.user);
     setPosts(res.posts);
     setRevealedSensitiveByPostId({});
+    setFollowerCount(res.user.followerCount ?? null);
+    setFollowingCount(res.user.followingCount ?? null);
   }, [me?._id, request, router, targetUserId]);
 
   useEffect(() => {
@@ -188,8 +192,14 @@ export default function UserProfileScreen() {
     if (!isFollowing) {
       // Đang chưa follow, gọi API tạo follow
       try {
-        await followService.followUser(targetUserId);
+        const res = await followService.followUser(targetUserId);
         setIsFollowing(true);
+        if (res && res.following && typeof res.following.followerCount === 'number') {
+          setFollowerCount(res.following.followerCount);
+        }
+        if (res && res.following && typeof res.following.followingCount === 'number') {
+          setFollowingCount(res.following.followingCount);
+        }
         Alert.alert("Thành công", "Bạn đã theo dõi người này.");
       } catch (err: any) {
         Alert.alert("Lỗi", err?.message || "Không thể theo dõi.");
@@ -206,8 +216,14 @@ export default function UserProfileScreen() {
             style: "destructive",
             onPress: async () => {
               try {
-                await followService.unfollowUser(targetUserId);
+                const res = await followService.unfollowUser(targetUserId);
                 setIsFollowing(false);
+                if (res && res.following && typeof res.following.followerCount === 'number') {
+                  setFollowerCount(res.following.followerCount);
+                }
+                if (res && res.following && typeof res.following.followingCount === 'number') {
+                  setFollowingCount(res.following.followingCount);
+                }
                 Alert.alert("Đã hủy theo dõi", "Bạn đã hủy theo dõi người này.");
               } catch (err: any) {
                 Alert.alert("Lỗi", err?.message || "Không thể hủy theo dõi.");
@@ -272,11 +288,11 @@ export default function UserProfileScreen() {
               <Text style={styles.statLabel}>posts</Text>
             </View>
             <View style={styles.statItem}>
-              <Text style={styles.statValue}>0</Text>
+              <Text style={styles.statValue}>{followerCount !== null ? followerCount : (profileUser?.followerCount ?? 0)}</Text>
               <Text style={styles.statLabel}>followers</Text>
             </View>
             <View style={styles.statItem}>
-              <Text style={styles.statValue}>0</Text>
+              <Text style={styles.statValue}>{followingCount !== null ? followingCount : (profileUser?.followingCount ?? 0)}</Text>
               <Text style={styles.statLabel}>following</Text>
             </View>
           </View>
