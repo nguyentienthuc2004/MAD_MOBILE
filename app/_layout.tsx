@@ -40,6 +40,9 @@ export default function RootLayout() {
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="(chats)" />
       <Stack.Screen name="users/[userId]" />
+      <Stack.Screen name="followers" />
+      <Stack.Screen name="change-password" />
+      <Stack.Screen name="edit-profile" />
       <Stack.Screen name="post-detail" />
       <Stack.Screen name="create-post-image" />
       <Stack.Screen name="create-post-music" />
