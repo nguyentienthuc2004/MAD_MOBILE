@@ -39,7 +39,25 @@ export function useChatRooms(_token?: string) {
                     index === arr.findIndex((r) => r._id === room._id),
             );
 
-            const mapped: ChatRoom[] = uniqueRooms.map((room) => {
+            // Ẩn phòng chat đã bị xoá (theo deletedAt của user),
+            // nhưng nếu có tin nhắn mới hơn deletedAt thì vẫn hiển thị
+            const filteredRooms = uniqueRooms.filter((room) => {
+                const me = room.users?.find((u) => u.user_id === meId);
+                const deletedAt = me?.deletedAt;
+                if (!deletedAt) return true;
+                // Nếu có lastMessage mới hơn deletedAt thì vẫn hiển thị
+                if (room.lastMessage?.createdAt) {
+                    try {
+                        const lastMsgTime = new Date(room.lastMessage.createdAt).getTime();
+                        const deletedAtTime = new Date(deletedAt).getTime();
+                        if (lastMsgTime > deletedAtTime) return true;
+                    } catch { }
+                }
+                // Ngược lại thì ẩn
+                return false;
+            });
+
+            const mapped: ChatRoom[] = filteredRooms.map((room) => {
                 const rawLastContent = room.lastMessage?.content?.trim() || "";
                 const isLastMine = meId
                     ? room.lastMessage?.sender === meId

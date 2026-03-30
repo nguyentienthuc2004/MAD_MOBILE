@@ -147,12 +147,25 @@ export default function ChatRoomScreen() {
                         index === arr.findIndex((m) => m._id === msg._id),
                 );
 
+                // Lấy deletedAt của user hiện tại trong room (an toàn hơn)
+                let deletedAt: string | null = null;
+                if (room && Array.isArray(room.users) && user?._id) {
+                    const me = room.users.find(u => String(u.user_id) === String(user._id));
+                    if (me && typeof me.deletedAt === "string" && me.deletedAt) {
+                        deletedAt = me.deletedAt;
+                    }
+                }
+                // Lọc tin nhắn mới hơn deletedAt (nếu có)
+                const filteredMessages = deletedAt
+                    ? uniqueMessages.filter(m => !m.createdAt || new Date(m.createdAt) > new Date(deletedAt!))
+                    : uniqueMessages;
+
                 // Cập nhật cursor và trạng thái còn tin nhắn cũ hay không
-                if (uniqueMessages.length > 0) {
-                    const oldest = uniqueMessages[uniqueMessages.length - 1];
+                if (filteredMessages.length > 0) {
+                    const oldest = filteredMessages[filteredMessages.length - 1];
                     setOldestCursor(oldest.createdAt ?? null);
                     // Nếu lấy đủ 20 tin thì có thể còn, nếu ít hơn thì coi như hết
-                    setHasMore(uniqueMessages.length >= 20);
+                    setHasMore(filteredMessages.length >= 20);
                 } else {
                     setOldestCursor(null);
                     setHasMore(false);
@@ -160,11 +173,11 @@ export default function ChatRoomScreen() {
 
                 // Tạo map để dễ tìm tin nhắn gốc khi có replyToMessage
                 const byId = new Map<string, MessageDto>();
-                uniqueMessages.forEach((m) => {
+                filteredMessages.forEach((m) => {
                     byId.set(m._id, m);
                 });
 
-                const mapped: ChatMessage[] = [...uniqueMessages]
+                const mapped: ChatMessage[] = [...filteredMessages]
                     .reverse()
                     .map((m) => {
                         const isDeleted = !!m.isDeleted;
@@ -208,7 +221,7 @@ export default function ChatRoomScreen() {
                 }
             }
         },
-        [meId, roomId],
+        [meId, roomId, room, user?._id],
     );
 
     useEffect(() => {

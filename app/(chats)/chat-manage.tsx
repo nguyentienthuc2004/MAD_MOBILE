@@ -12,6 +12,7 @@ import {
     View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { chatService } from "../../services/chat.service";
 
 export default function ChatManageScreen() {
     const router = useRouter();
@@ -42,7 +43,8 @@ export default function ChatManageScreen() {
         // TODO: Gửi trạng thái bật/tắt thông báo cho backend hoặc lưu local
     };
 
-    const handleDeleteChat = () => {
+    const handleDeleteChat = async () => {
+        if (!roomId) return;
         Alert.alert(
             "Xóa đoạn chat",
             "Bạn có chắc muốn xóa toàn bộ lịch sử đoạn chat này?",
@@ -51,10 +53,14 @@ export default function ChatManageScreen() {
                 {
                     text: "Xóa",
                     style: "destructive",
-                    onPress: () => {
-                        // TODO: Gọi API xóa đoạn chat hoặc đánh dấu isDeleted
-                        Alert.alert("Đã xóa", "Đoạn chat đã được xóa (giả lập).");
-                        router.back();
+                    onPress: async () => {
+                        try {
+                            await chatService.deleteRoom(String(roomId));
+                            Alert.alert("Đã xóa", "Đoạn chat đã được xóa.");
+                            router.back();
+                        } catch (err: any) {
+                            Alert.alert("Lỗi", err?.message || "Không thể xoá đoạn chat");
+                        }
                     },
                 },
             ],
