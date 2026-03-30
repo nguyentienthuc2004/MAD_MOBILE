@@ -77,6 +77,19 @@ type SeenMessagesResponse = ApiEnvelope<{
 }>;
 
 export const chatService = {
+    updateRoomTitle(roomId: string, title: string) {
+        return apiAuthRequest<ApiEnvelope<{ room: RoomChatDto }>>(`/chat/room/${roomId}/title`, {
+            method: "PATCH",
+            body: { title },
+        });
+    },
+
+    updateRoomAvatar(roomId: string, avatar: string) {
+        return apiAuthRequest<ApiEnvelope<{ room: RoomChatDto }>>(`/chat/room/${roomId}/avatar`, {
+            method: "PATCH",
+            body: { avatar },
+        });
+    },
     getRooms() {
         return apiAuthRequest<GetRoomsResponse>("/chat/rooms", {
             method: "GET",

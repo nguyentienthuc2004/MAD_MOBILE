@@ -132,30 +132,25 @@ export default function ChatManageScreen() {
 
     // Hàm upload avatar (dùng uri ảnh đã chọn hoặc link nhập tay)
     const handleSaveAvatar = async () => {
-        if (!roomId || !pickedAvatarUri) return;
+        if (!roomId || !pickedAvatarUri) {
+            console.log("Không có roomId hoặc pickedAvatarUri", { roomId, pickedAvatarUri });
+            return;
+        }
         setLoadingEdit(true);
         try {
             const avatarUrl = pickedAvatarUri;
-            // TODO: Thay bằng API upload thực tế nếu cần
-            const API_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:5000";
-            const res = await fetch(`${API_URL}/api/chat/room/${roomId}/avatar`, {
-                method: "PATCH",
-                headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
-                },
-                body: JSON.stringify({ avatar: avatarUrl }),
-            });
-            const data = await res.json();
-            if (data.success) {
+            const res = await chatService.updateRoomAvatar(roomId, avatarUrl);
+            console.log("Dữ liệu trả về avatar:", res);
+            if (res.success) {
                 setGroupAvatar(avatarUrl);
                 setShowEditAvatarModal(false);
                 setPickedAvatarUri("");
                 Alert.alert("Thành công", "Đã đổi avatar nhóm");
             } else {
-                Alert.alert("Lỗi", data.message || "Không đổi được avatar nhóm");
+                Alert.alert("Lỗi", res.message || "Không đổi được avatar nhóm");
             }
         } catch (e) {
+            console.log("Lỗi khi PATCH avatar:", e);
             Alert.alert("Lỗi", "Không kết nối được server");
         }
         setLoadingEdit(false);
@@ -240,28 +235,24 @@ export default function ChatManageScreen() {
                                     style={[styles.modalButton, styles.modalPrimary]}
                                     disabled={loadingEdit || !newGroupName.trim()}
                                     onPress={async () => {
-                                        if (!roomId || !newGroupName.trim()) return;
+                                        if (!roomId || !newGroupName.trim()) {
+                                            console.log("Không có roomId hoặc tên nhóm mới", { roomId, newGroupName });
+                                            return;
+                                        }
                                         setLoadingEdit(true);
                                         try {
-                                            const API_URL = process.env.EXPO_PUBLIC_API_URL;
-                                            const res = await fetch(`${API_URL}/api/chat/room/${roomId}/title`, {
-                                                method: "PATCH",
-                                                headers: {
-                                                    "Content-Type": "application/json",
-                                                    Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
-                                                },
-                                                body: JSON.stringify({ title: newGroupName.trim() }),
-                                            });
-                                            const data = await res.json();
-                                            if (data.success) {
+                                            const res = await chatService.updateRoomTitle(roomId, newGroupName.trim());
+                                            console.log("Dữ liệu trả về title:", res);
+                                            if (res.success) {
                                                 setGroupName(newGroupName.trim());
                                                 setShowEditNameModal(false);
                                                 setNewGroupName("");
                                                 Alert.alert("Thành công", "Đã đổi tên nhóm");
                                             } else {
-                                                Alert.alert("Lỗi", data.message || "Không đổi được tên nhóm");
+                                                Alert.alert("Lỗi", res.message || "Không đổi được tên nhóm");
                                             }
                                         } catch (e) {
+                                            console.log("Lỗi khi PATCH title:", e);
                                             Alert.alert("Lỗi", "Không kết nối được server");
                                         }
                                         setLoadingEdit(false);
