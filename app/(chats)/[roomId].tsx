@@ -327,6 +327,27 @@ export default function ChatRoomScreen() {
         void fetchRoom();
     }, [fetchRoom]);
 
+    // Lắng nghe sự kiện đổi avatar realtime
+    useEffect(() => {
+        if (!roomId) return;
+        const handleUserAvatarChanged = (payload: { userId: string; avatarUrl: string }) => {
+            // Cập nhật avatar cho user tương ứng trong room.users
+            setRoom(prev => {
+                if (!prev || !prev.users) return prev;
+                const updatedUsers = prev.users.map(u =>
+                    String(u.user_id) === String(payload.userId)
+                        ? { ...u, avatar: payload.avatarUrl }
+                        : u
+                );
+                return { ...prev, users: updatedUsers };
+            });
+        };
+        socket.on("USER_AVATAR_CHANGED", handleUserAvatarChanged);
+        return () => {
+            socket.off("USER_AVATAR_CHANGED", handleUserAvatarChanged);
+        };
+    }, [roomId]);
+
     // Đánh dấu đã xem khi mở phòng chat
     useEffect(() => {
         if (!roomId) return;
@@ -1004,6 +1025,10 @@ export default function ChatRoomScreen() {
                             refreshControl={
                                 <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
                             }
+                            initialNumToRender={15}
+                            maxToRenderPerBatch={20}
+                            removeClippedSubviews={true}
+                            windowSize={7}
                         />
                     )}
                 </View>
@@ -1397,67 +1422,89 @@ const styles = StyleSheet.create({
     },
     messageBubble: {
         maxWidth: "78%",
-        borderRadius: 16,
-        paddingHorizontal: 10,
-        paddingVertical: 6,
+        borderRadius: 20,
+        paddingHorizontal: 14,
+        paddingVertical: 10,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.08,
+        shadowRadius: 6,
+        elevation: 2,
+        marginBottom: 2,
     },
     messageBubbleMine: {
-        backgroundColor: "#0a84ff",
-    },
-    messageBubbleOther: {
-        backgroundColor: "#e5e5ea",
-    },
-    messageAvatarWrap: {
-        marginRight: 6,
+        backgroundColor: "#2563eb",
         alignSelf: "flex-end",
     },
+    messageBubbleOther: {
+        backgroundColor: "#f3f4f6",
+        alignSelf: "flex-start",
+        borderWidth: 1,
+        borderColor: "#e5e7eb",
+    },
+    messageAvatarWrap: {
+        marginRight: 8,
+        alignSelf: "flex-end",
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.10,
+        shadowRadius: 3,
+        elevation: 2,
+    },
     messageAvatar: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
-        backgroundColor: "#e5e7eb",
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: "#fff",
+        borderWidth: 2,
+        borderColor: "#fff",
     },
     messageAvatarFallback: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
-        backgroundColor: "#e5e7eb",
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: "#e0e7ef",
         alignItems: "center",
         justifyContent: "center",
+        borderWidth: 2,
+        borderColor: "#fff",
     },
     messageAvatarInitial: {
-        fontSize: 14,
-        fontWeight: "600",
-        color: "#4b5563",
+        fontSize: 16,
+        fontWeight: "700",
+        color: "#64748b",
     },
     messageImagesWrap: {
-        marginTop: 4,
-        gap: 4,
+        marginTop: 6,
+        flexDirection: 'row',
+        gap: 8,
     },
     messageImage: {
-        width: 180,
-        height: 180,
-        borderRadius: 12,
-        backgroundColor: "#d1d5db",
+        width: 140,
+        height: 140,
+        borderRadius: 14,
+        backgroundColor: "#e0e7ef",
+        marginRight: 4,
     },
     messageTimeRow: {
-        alignSelf: "flex-start",
-        marginTop: 2,
+        alignSelf: "flex-end",
+        marginTop: 4,
     },
     messageText: {
         fontSize: 15,
-        color: "#111",
+        color: "#22223b",
+        lineHeight: 22,
     },
     messageTextMine: {
         color: "#fff",
     },
     messageTime: {
         fontSize: 11,
-        color: "#9ca3af",
-        textAlign: "left",
+        color: "#a0aec0",
+        textAlign: "right",
     },
     messageTimeMine: {
-        color: "#d1d5db",
+        color: "#e0e7ef",
     },
     replyPreview: {
         borderLeftWidth: 2,
@@ -1477,11 +1524,15 @@ const styles = StyleSheet.create({
     inputRow: {
         flexDirection: "row",
         alignItems: "flex-end",
-        paddingHorizontal: 10,
-        paddingVertical: 8,
-        borderTopWidth: StyleSheet.hairlineWidth,
-        borderTopColor: "#e5e5e5",
-        backgroundColor: "#fff",
+        paddingHorizontal: 14,
+        paddingVertical: 10,
+        borderTopWidth: 0,
+        backgroundColor: "#f8fafc",
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -2 },
+        shadowOpacity: 0.06,
+        shadowRadius: 8,
+        elevation: 8,
     },
     inputActions: {
         flexDirection: "row",
@@ -1489,34 +1540,46 @@ const styles = StyleSheet.create({
         marginRight: 6,
     },
     iconButton: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
-        alignItems: "center",
-        justifyContent: "center",
-        marginRight: 2,
-    },
-    input: {
-        flex: 1,
-        minHeight: 36,
-        maxHeight: 100,
-        paddingHorizontal: 10,
-        paddingVertical: 6,
-        borderRadius: 18,
-        backgroundColor: "#f3f4f6",
-        fontSize: 14,
-    },
-    sendButton: {
-        marginLeft: 8,
         width: 36,
         height: 36,
         borderRadius: 18,
-        backgroundColor: "#0a84ff",
         alignItems: "center",
         justifyContent: "center",
+        marginRight: 4,
+        backgroundColor: '#f1f5f9',
+    },
+    input: {
+        flex: 1,
+        minHeight: 40,
+        maxHeight: 120,
+        paddingHorizontal: 14,
+        paddingVertical: 8,
+        borderRadius: 20,
+        backgroundColor: "#fff",
+        fontSize: 15,
+        marginRight: 6,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.08,
+        shadowRadius: 4,
+        elevation: 2,
+    },
+    sendButton: {
+        marginLeft: 4,
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: "#2563eb",
+        alignItems: "center",
+        justifyContent: "center",
+        shadowColor: '#2563eb',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.12,
+        shadowRadius: 6,
+        elevation: 3,
     },
     sendButtonDisabled: {
-        backgroundColor: "#9ca3af",
+        backgroundColor: "#cbd5e1",
     },
     typingIndicatorRow: {
         paddingHorizontal: 16,
