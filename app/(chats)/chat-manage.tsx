@@ -1,8 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
     Alert,
+    Image,
     Modal,
     Pressable,
     StyleSheet,
@@ -15,6 +17,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { chatService } from "../../services/chat.service";
 
 export default function ChatManageScreen() {
+
     const router = useRouter();
     const { roomId, name, userId } =
         useLocalSearchParams<{ roomId: string; name?: string; userId?: string }>();
@@ -22,8 +25,32 @@ export default function ChatManageScreen() {
     const [searchKeyword, setSearchKeyword] = useState("");
     const [notificationEnabled, setNotificationEnabled] = useState(true);
     const [showSearchModal, setShowSearchModal] = useState(false);
+    const [roomType, setRoomType] = useState<string | null>(null);
+    const [groupName, setGroupName] = useState<string>(name || "");
+    const [groupAvatar, setGroupAvatar] = useState<string>("");
+    const [showEditNameModal, setShowEditNameModal] = useState(false);
+    const [showEditAvatarModal, setShowEditAvatarModal] = useState(false);
+    const [newGroupName, setNewGroupName] = useState("");
+    // const [newGroupAvatar, setNewGroupAvatar] = useState("");
+    const [loadingEdit, setLoadingEdit] = useState(false);
+    const [pickedAvatarUri, setPickedAvatarUri] = useState<string>("");
 
     const hasUserProfile = typeof userId === "string" && userId.length > 0;
+
+    // Lấy thông tin phòng chat để biết loại group/friend
+    useEffect(() => {
+        if (!roomId) return;
+        chatService.getRooms().then((res: any) => {
+            if (res?.success && Array.isArray(res.data?.rooms)) {
+                const found = res.data.rooms.find((r: any) => r._id === roomId);
+                if (found) {
+                    setRoomType(found.typeRoom);
+                    setGroupName(found.title || "");
+                    setGroupAvatar(found.avatar || "");
+                }
+            }
+        });
+    }, [roomId]);
 
     const handleSearchMessages = () => {
         if (!searchKeyword.trim()) {
@@ -86,6 +113,54 @@ export default function ChatManageScreen() {
         );
     };
 
+    // Hàm chọn ảnh từ thư viện
+    const handlePickAvatar = async () => {
+        try {
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                allowsEditing: true,
+                aspect: [1, 1],
+                quality: 1,
+            });
+            if (!result.canceled && result.assets && result.assets.length > 0) {
+                setPickedAvatarUri(result.assets[0].uri);
+            }
+        } catch (e) {
+            Alert.alert("Lỗi", "Không thể chọn ảnh từ thư viện");
+        }
+    };
+
+    // Hàm upload avatar (dùng uri ảnh đã chọn hoặc link nhập tay)
+    const handleSaveAvatar = async () => {
+        if (!roomId || !pickedAvatarUri) return;
+        setLoadingEdit(true);
+        try {
+            const avatarUrl = pickedAvatarUri;
+            // TODO: Thay bằng API upload thực tế nếu cần
+            const API_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:5000";
+            const res = await fetch(`${API_URL}/api/chat/room/${roomId}/avatar`, {
+                method: "PATCH",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
+                },
+                body: JSON.stringify({ avatar: avatarUrl }),
+            });
+            const data = await res.json();
+            if (data.success) {
+                setGroupAvatar(avatarUrl);
+                setShowEditAvatarModal(false);
+                setPickedAvatarUri("");
+                Alert.alert("Thành công", "Đã đổi avatar nhóm");
+            } else {
+                Alert.alert("Lỗi", data.message || "Không đổi được avatar nhóm");
+            }
+        } catch (e) {
+            Alert.alert("Lỗi", "Không kết nối được server");
+        }
+        setLoadingEdit(false);
+    };
+
     return (
         <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
             <View style={styles.header}>
@@ -99,15 +174,151 @@ export default function ChatManageScreen() {
 
             <View style={styles.roomInfo}>
                 <View style={styles.roomAvatarWrap}>
-                    <Ionicons
-                        name="person-circle-outline"
-                        size={64}
-                        color="#9ca3af"
-                    />
+                    {roomType === "group" && groupAvatar ? (
+                        <Pressable onPress={() => setShowEditAvatarModal(true)}>
+                            <View style={{ alignItems: "center" }}>
+                                <View style={{ borderRadius: 40, overflow: "hidden", borderWidth: 2, borderColor: "#d1d5db" }}>
+                                    <Image source={{ uri: groupAvatar }} style={{ width: 64, height: 64 }} />
+                                </View>
+                                <Text style={{ fontSize: 12, color: "#0a84ff", marginTop: 2 }}>Đổi ảnh</Text>
+                            </View>
+                        </Pressable>
+                    ) : (
+                        <Ionicons
+                            name="person-circle-outline"
+                            size={64}
+                            color="#9ca3af"
+                        />
+                    )}
                 </View>
                 <Text style={styles.roomName} numberOfLines={1}>
-                    {name || "Đoạn chat"}
+                    {roomType === "group" && groupName ? groupName : (name || "Đoạn chat")}
                 </Text>
+                {/* Nếu là group thì hiển thị nút đổi ảnh và tên nhóm */}
+                {roomType === "group" && (
+                    <View style={{ flexDirection: "row", justifyContent: "center", marginTop: 8 }}>
+                        <Pressable
+                            style={[styles.profileButton, { marginRight: 8 }]}
+                            onPress={() => setShowEditAvatarModal(true)}
+                        >
+                            <Text style={styles.profileButtonText}>Đổi ảnh nhóm</Text>
+                        </Pressable>
+                        <Pressable
+                            style={styles.profileButton}
+                            onPress={() => setShowEditNameModal(true)}
+                        >
+                            <Text style={styles.profileButtonText}>Đổi tên nhóm</Text>
+                        </Pressable>
+                    </View>
+                )}
+                {/* Modal đổi tên nhóm */}
+                <Modal
+                    visible={showEditNameModal}
+                    transparent
+                    animationType="slide"
+                    onRequestClose={() => setShowEditNameModal(false)}
+                >
+                    <View style={styles.modalBackdrop}>
+                        <View style={styles.modalContent}>
+                            <Text style={styles.modalTitle}>Đổi tên nhóm</Text>
+                            <TextInput
+                                style={styles.modalInput}
+                                placeholder="Nhập tên nhóm mới"
+                                placeholderTextColor="#9ca3af"
+                                value={newGroupName}
+                                onChangeText={setNewGroupName}
+                            />
+                            <View style={styles.modalActions}>
+                                <Pressable
+                                    style={[styles.modalButton, styles.modalCancel]}
+                                    onPress={() => setShowEditNameModal(false)}
+                                    disabled={loadingEdit}
+                                >
+                                    <Text style={styles.modalCancelText}>Hủy</Text>
+                                </Pressable>
+                                <Pressable
+                                    style={[styles.modalButton, styles.modalPrimary]}
+                                    disabled={loadingEdit || !newGroupName.trim()}
+                                    onPress={async () => {
+                                        if (!roomId || !newGroupName.trim()) return;
+                                        setLoadingEdit(true);
+                                        try {
+                                            const API_URL = process.env.EXPO_PUBLIC_API_URL;
+                                            const res = await fetch(`${API_URL}/api/chat/room/${roomId}/title`, {
+                                                method: "PATCH",
+                                                headers: {
+                                                    "Content-Type": "application/json",
+                                                    Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
+                                                },
+                                                body: JSON.stringify({ title: newGroupName.trim() }),
+                                            });
+                                            const data = await res.json();
+                                            if (data.success) {
+                                                setGroupName(newGroupName.trim());
+                                                setShowEditNameModal(false);
+                                                setNewGroupName("");
+                                                Alert.alert("Thành công", "Đã đổi tên nhóm");
+                                            } else {
+                                                Alert.alert("Lỗi", data.message || "Không đổi được tên nhóm");
+                                            }
+                                        } catch (e) {
+                                            Alert.alert("Lỗi", "Không kết nối được server");
+                                        }
+                                        setLoadingEdit(false);
+                                    }}
+                                >
+                                    <Text style={styles.modalPrimaryText}>{loadingEdit ? "Đang lưu..." : "Lưu"}</Text>
+                                </Pressable>
+                            </View>
+                        </View>
+                    </View>
+                </Modal>
+
+                {/* Modal đổi avatar nhóm */}
+                <Modal
+                    visible={showEditAvatarModal}
+                    transparent
+                    animationType="slide"
+                    onRequestClose={() => setShowEditAvatarModal(false)}
+                >
+                    <View style={styles.modalBackdrop}>
+                        <View style={styles.modalContent}>
+                            <Text style={styles.modalTitle}>Đổi avatar nhóm</Text>
+                            {/* Hiển thị ảnh đã chọn (nếu có) */}
+                            {pickedAvatarUri ? (
+                                <View style={{ alignItems: "center", marginBottom: 10 }}>
+                                    <Image source={{ uri: pickedAvatarUri }} style={{ width: 80, height: 80, borderRadius: 40 }} />
+                                </View>
+                            ) : null}
+                            <Pressable
+                                style={{ marginBottom: 10, alignSelf: "center", backgroundColor: "#e5e7eb", borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8 }}
+                                onPress={handlePickAvatar}
+                                disabled={loadingEdit}
+                            >
+                                <Text style={{ color: "#111", fontSize: 14 }}>Chọn ảnh từ máy</Text>
+                            </Pressable>
+                            <View style={styles.modalActions}>
+                                <Pressable
+                                    style={[styles.modalButton, styles.modalCancel]}
+                                    onPress={() => {
+                                        setShowEditAvatarModal(false);
+                                        setPickedAvatarUri("");
+                                    }}
+                                    disabled={loadingEdit}
+                                >
+                                    <Text style={styles.modalCancelText}>Hủy</Text>
+                                </Pressable>
+                                <Pressable
+                                    style={[styles.modalButton, styles.modalPrimary]}
+                                    disabled={loadingEdit || !pickedAvatarUri}
+                                    onPress={handleSaveAvatar}
+                                >
+                                    <Text style={styles.modalPrimaryText}>{loadingEdit ? "Đang lưu..." : "Lưu"}</Text>
+                                </Pressable>
+                            </View>
+                        </View>
+                    </View>
+                </Modal>
                 {hasUserProfile && (
                     <Pressable
                         style={styles.profileButton}
@@ -168,24 +379,27 @@ export default function ChatManageScreen() {
                     <Ionicons name="chevron-forward" size={18} color="#9ca3af" />
                 </Pressable>
 
-                <Pressable
-                    style={styles.row}
-                    onPress={() => {
-                        if (!roomId) return;
-                        router.push({ pathname: "/(chats)/group-members", params: { roomId: String(roomId) } });
-                    }}
-                >
-                    <View style={styles.rowLeft}>
-                        <Ionicons
-                            name="people"
-                            size={20}
-                            color="#6366f1"
-                            style={styles.rowIcon}
-                        />
-                        <Text style={styles.rowTitle}>Thành viên nhóm & đổi quyền</Text>
-                    </View>
-                    <Ionicons name="chevron-forward" size={18} color="#9ca3af" />
-                </Pressable>
+                {/* Hiển thị nút thành viên & phân quyền chỉ khi là group */}
+                {roomType === "group" && (
+                    <Pressable
+                        style={styles.row}
+                        onPress={() => {
+                            if (!roomId) return;
+                            router.push({ pathname: "/(chats)/group-members", params: { roomId: String(roomId) } });
+                        }}
+                    >
+                        <View style={styles.rowLeft}>
+                            <Ionicons
+                                name="people"
+                                size={20}
+                                color="#6366f1"
+                                style={styles.rowIcon}
+                            />
+                            <Text style={styles.rowTitle}>Thành viên nhóm & đổi quyền</Text>
+                        </View>
+                        <Ionicons name="chevron-forward" size={18} color="#9ca3af" />
+                    </Pressable>
+                )}
             </View>
 
             <View style={styles.section}>
