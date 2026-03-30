@@ -238,10 +238,42 @@ export default function Home() {
       return;
     }
 
+    // Optimistic update
     setFollowingByUserId((prev) => ({
       ...prev,
       [authorId]: nextValue,
     }));
+
+    setFollowIds((prev) => {
+      const next = new Set(prev);
+      if (nextValue) next.add(authorId);
+      else next.delete(authorId);
+      return next;
+    });
+
+    (async () => {
+      try {
+        if (nextValue) {
+          await followService.followUser(authorId);
+        } else {
+          await followService.unfollowUser(authorId);
+        }
+      } catch (err: any) {
+        // Revert optimistic update on error
+        setFollowingByUserId((prev) => ({
+          ...prev,
+          [authorId]: !nextValue,
+        }));
+        setFollowIds((prev) => {
+          const reverted = new Set(prev);
+          if (!nextValue) reverted.add(authorId);
+          else reverted.delete(authorId);
+          return reverted;
+        });
+
+        Alert.alert("Lỗi", err?.message || "Không thể thay đổi trạng thái theo dõi");
+      }
+    })();
   };
 
   const getIsFollowing = (post: Post) => {

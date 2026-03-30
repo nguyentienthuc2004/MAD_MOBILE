@@ -513,12 +513,6 @@ export default function PostCard({
               </Text>
             </Pressable>
           ) : null}
-          <Pressable
-            onPress={() => setShowMoreMenu(true)}
-            style={styles.moreButton}
-          >
-            <Ionicons name="ellipsis-horizontal" size={18} color="black" />
-          </Pressable>
         </View>
       </View>
 
