@@ -6,12 +6,14 @@ import { type Post as ApiPost, postService } from "@/services/post.service";
 import {
   searchService,
   type SearchUser,
+  type SearchPost,
 } from "@/services/search.service";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Dimensions,
   FlatList,
   Image,
@@ -39,11 +41,22 @@ const SearchScreen = () => {
   // User search results
   const [searchResults, setSearchResults] = useState<SearchUser[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
+  const [searchPostResults, setSearchPostResults] = useState<SearchPost[]>([]);
 
   // Explore grid posts
   const { request: fetchExplore, loading: exploreLoading } =
     useApi<ApiResponse<ApiPost[]>>();
   const [explorePosts, setExplorePosts] = useState<ApiPost[]>([]);
+
+  // Persist revealed sensitive flags across remounts in this module
+  // so returning from post-detail keeps the overlay state.
+  /* eslint-disable @typescript-eslint/consistent-type-assertions */
+  let revealedSensitiveCache: Record<string, boolean> = (global as any).__revealedSensitiveCache || {};
+  (global as any).__revealedSensitiveCache = revealedSensitiveCache;
+  const [revealedSensitiveByPostId, setRevealedSensitiveByPostId] =
+    useState<Record<string, boolean>>(revealedSensitiveCache);
+  /* eslint-enable @typescript-eslint/consistent-type-assertions */
+  const [refreshing, setRefreshing] = useState(false);
 
   // Follow toggling state
   const [followLoadingIds, setFollowLoadingIds] = useState<Set<string>>(
@@ -73,10 +86,26 @@ const SearchScreen = () => {
     setSearchLoading(true);
     const timer = setTimeout(async () => {
       try {
-        const res = await searchService.searchUsers(query.trim());
-        setSearchResults(res.data ?? []);
-      } catch {
+        const q = query.trim();
+        const [usersRes, postsRes] = await Promise.allSettled([
+          searchService.searchUsers(q),
+          searchService.searchPosts(q),
+        ]);
+
+        if (usersRes.status === "fulfilled") {
+          setSearchResults(usersRes.value.data ?? []);
+        } else {
+          setSearchResults([]);
+        }
+
+        if (postsRes.status === "fulfilled") {
+          setSearchPostResults(postsRes.value.data ?? []);
+        } else {
+          setSearchPostResults([]);
+        }
+      } catch (err) {
         setSearchResults([]);
+        setSearchPostResults([]);
       } finally {
         setSearchLoading(false);
       }
@@ -176,22 +205,197 @@ const SearchScreen = () => {
   const renderGridItem = ({
     item,
   }: {
-    item: ApiPost;
+    item: ApiPost | SearchPost;
   }) => {
     const imageUri = item.images?.[0] || FALLBACK_POST_IMAGE;
+    const isBlocked = Boolean(item.isSensitive) && !revealedSensitiveByPostId[item._id];
+
+    const handlePress = () => {
+      if (!isBlocked) {
+        router.push({ pathname: "/post-detail", params: { postId: item._id } });
+        return;
+      }
+
+      // confirm reveal
+      Alert.alert(
+        "Nội dung nhạy cảm",
+        "Bài viết này có thể chứa hình ảnh không phù hợp với một số người xem. Bạn có muốn tiếp tục không?",
+        [
+          { text: "Hủy", style: "cancel" },
+          {
+            text: "Xem bài viết",
+            onPress: () => {
+              // persist to module/global cache so returning keeps the overlay state
+              const g = global as any;
+              g.__revealedSensitiveCache = { ...(g.__revealedSensitiveCache || {}), [item._id]: true };
+              setRevealedSensitiveByPostId((prev) => ({ ...prev, [item._id]: true }));
+              router.push({ pathname: "/post-detail", params: { postId: item._id } });
+            },
+          },
+        ],
+      );
+    };
 
     return (
-      <Pressable
-        style={styles.gridItem}
-        onPress={() =>
-          router.push({
-            pathname: "/post-detail",
-            params: { postId: item._id },
-          })
-        }
-      >
-        <Image source={{ uri: imageUri }} style={styles.gridImage} />
+      <Pressable key={item._id} style={styles.gridItem} onPress={handlePress}>
+        <Image
+          source={{ uri: imageUri }}
+          blurRadius={isBlocked ? 20 : 0}
+          style={styles.gridImage}
+        />
+        {item.isSensitive && isBlocked ? (
+          <View style={styles.sensitiveGridOverlay}>
+            <Ionicons name="eye-off" size={18} color="#fff" />
+          </View>
+        ) : null}
       </Pressable>
+    );
+  };
+
+  const renderSearchPostGridItem = ({ item }: { item: SearchPost }) => {
+    const imageUri = item.images?.[0] || FALLBACK_POST_IMAGE;
+    const isBlocked = Boolean(item.isSensitive) && !revealedSensitiveByPostId[item._id];
+
+    const handlePress = () => {
+      if (!isBlocked) {
+        router.push({ pathname: "/post-detail", params: { postId: item._id } });
+        return;
+      }
+
+      Alert.alert(
+        "Nội dung nhạy cảm",
+        "Bài viết này có thể chứa hình ảnh không phù hợp với một số người xem. Bạn có muốn tiếp tục không?",
+        [
+          { text: "Hủy", style: "cancel" },
+          {
+            text: "Xem bài viết",
+            onPress: () => {
+              const g = global as any;
+              g.__revealedSensitiveCache = { ...(g.__revealedSensitiveCache || {}), [item._id]: true };
+              setRevealedSensitiveByPostId((prev) => ({ ...prev, [item._id]: true }));
+              router.push({ pathname: "/post-detail", params: { postId: item._id } });
+            },
+          },
+        ],
+      );
+    };
+
+    return (
+      <Pressable key={item._id} style={styles.gridItem} onPress={handlePress}>
+        <Image
+          source={{ uri: imageUri }}
+          blurRadius={isBlocked ? 20 : 0}
+          style={styles.gridImage}
+        />
+        {item.isSensitive && isBlocked ? (
+          <View style={styles.sensitiveGridOverlay}>
+            <Ionicons name="eye-off" size={18} color="#fff" />
+          </View>
+        ) : null}
+      </Pressable>
+    );
+  };
+
+  const handleRefresh = async () => {
+    try {
+      setRefreshing(true);
+
+      if (isSearching) {
+        if (!query.trim()) {
+          return;
+        }
+        try {
+          const q = query.trim();
+          const [usersRes, postsRes] = await Promise.allSettled([
+            searchService.searchUsers(q),
+            searchService.searchPosts(q),
+          ]);
+
+          if (usersRes.status === "fulfilled") {
+            setSearchResults(usersRes.value.data ?? []);
+          } else {
+            setSearchResults([]);
+          }
+
+          if (postsRes.status === "fulfilled") {
+            setSearchPostResults(postsRes.value.data ?? []);
+          } else {
+            setSearchPostResults([]);
+          }
+        } catch {
+          // ignore
+          setSearchResults([]);
+          setSearchPostResults([]);
+        }
+      } else {
+        const res = await fetchExplore(() => postService.getPostsNotByMe());
+        if (res?.data) {
+          setExplorePosts(res.data);
+        }
+      }
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const renderSearchResults = () => {
+    if (searchLoading) {
+      return (
+        <View style={styles.centerWrap}>
+          <ActivityIndicator size="large" color="#3b82f6" />
+        </View>
+      );
+    }
+
+    const noUsers = (searchResults?.length ?? 0) === 0;
+    const noPosts = (searchPostResults?.length ?? 0) === 0;
+
+    if (noUsers && noPosts) {
+      return (
+        <View style={styles.centerWrap}>
+          <Text style={styles.emptyText}>Không tìm thấy kết quả</Text>
+        </View>
+      );
+    }
+
+    if (!noUsers) {
+      return (
+        <FlatList
+          data={searchResults}
+          renderItem={renderUserItem}
+          keyExtractor={(item) => item._id}
+          contentContainerStyle={styles.userListContent}
+          showsVerticalScrollIndicator={false}
+          refreshing={refreshing}
+          onRefresh={handleRefresh}
+          ListFooterComponent={() => (
+            <View style={styles.postsGridWrap}>
+              <Text style={styles.sectionTitle}>Bài viết</Text>
+              <View style={styles.gridWrap}>
+                {searchPostResults.map((p) => (
+                  <View key={p._id} style={styles.gridItem}>
+                    {renderSearchPostGridItem({ item: p })}
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
+        />
+      );
+    }
+
+    // No users but have posts
+    return (
+      <FlatList
+        data={searchPostResults}
+        renderItem={renderSearchPostGridItem}
+        keyExtractor={(item) => item._id}
+        numColumns={3}
+        columnWrapperStyle={styles.gridRow}
+        showsVerticalScrollIndicator={false}
+        refreshing={refreshing}
+        onRefresh={handleRefresh}
+      />
     );
   };
 
@@ -226,6 +430,7 @@ const SearchScreen = () => {
                 setQuery("");
                 setIsSearching(false);
                 setSearchResults([]);
+                setSearchPostResults([]);
               }}
               style={styles.clearBtn}
             >
@@ -237,26 +442,7 @@ const SearchScreen = () => {
 
       {/* Content */}
       {isSearching ? (
-        // Search results
-        searchLoading ? (
-          <View style={styles.centerWrap}>
-            <ActivityIndicator size="large" color="#3b82f6" />
-          </View>
-        ) : searchResults.length === 0 ? (
-          <View style={styles.centerWrap}>
-            <Text style={styles.emptyText}>
-              Không tìm thấy người dùng nào
-            </Text>
-          </View>
-        ) : (
-          <FlatList
-            data={searchResults}
-            renderItem={renderUserItem}
-            keyExtractor={(item) => item._id}
-            contentContainerStyle={styles.userListContent}
-            showsVerticalScrollIndicator={false}
-          />
-        )
+        renderSearchResults()
       ) : (
         // Explore grid
         exploreLoading ? (
@@ -271,6 +457,8 @@ const SearchScreen = () => {
             numColumns={3}
             columnWrapperStyle={styles.gridRow}
             showsVerticalScrollIndicator={false}
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
           />
         )
       )}
@@ -384,6 +572,12 @@ const styles = StyleSheet.create({
     height: "100%",
     backgroundColor: "#f3f4f6",
   },
+  sensitiveGridOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.35)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
 
   // Empty / center
   centerWrap: {
@@ -394,5 +588,15 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 14,
     color: "#9ca3af",
+  },
+  postsGridWrap: {
+    paddingHorizontal: 14,
+    paddingTop: 12,
+  },
+  sectionTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#111",
+    marginBottom: 8,
   },
 });

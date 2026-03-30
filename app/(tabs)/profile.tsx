@@ -161,7 +161,7 @@ const ProfileScreen = () => {
           </Pressable>
 
           <Pressable style={styles.headerIconButton} onPress={logout}>
-            <Ionicons name="menu-outline" size={24} color="#111" />
+            <Ionicons name="log-out-outline" size={22} color="#111" />
           </Pressable>
         </View>
 
