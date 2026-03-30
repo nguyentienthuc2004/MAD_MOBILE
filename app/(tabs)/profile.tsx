@@ -26,6 +26,7 @@ const FALLBACK_POST_IMAGE = "https://placehold.co/1080x1080?text=Post";
 const ProfileScreen = () => {
   const router = useRouter();
   const user = useAuth((state) => state.user);
+  const refetchMe = useAuth((state) => state.refetchMe);
   const { request, loading, error } = useApi<ApiResponse<ApiPost[]>>();
   const [posts, setPosts] = useState<ApiPost[]>([]);
   const [refreshing, setRefreshing] = useState(false);
@@ -56,11 +57,12 @@ const ProfileScreen = () => {
   const handleRefresh = useCallback(async () => {
     try {
       setRefreshing(true);
+      await refetchMe();
       await fetchPosts();
     } finally {
       setRefreshing(false);
     }
-  }, [fetchPosts]);
+  }, [fetchPosts, refetchMe]);
 
   const feedPosts = useMemo<FeedPost[]>(() => {
     const displayName = user?.displayName || user?.username || "Bạn";
@@ -114,6 +116,32 @@ const ProfileScreen = () => {
     );
   };
 
+  const handleOpenFollowers = () => {
+    router.push({
+      pathname: "/followers",
+      params: {
+        userId: user?._id ?? "",
+        username: user?.username ?? "",
+        initialTab: "followers",
+        followerCount: String(user?.followerCount ?? 0),
+        followingCount: String(user?.followingCount ?? 0),
+      },
+    } as any);
+  };
+
+  const handleOpenFollowing = () => {
+    router.push({
+      pathname: "/followers",
+      params: {
+        userId: user?._id ?? "",
+        username: user?.username ?? "",
+        initialTab: "following",
+        followerCount: String(user?.followerCount ?? 0),
+        followingCount: String(user?.followingCount ?? 0),
+      },
+    } as any);
+  };
+
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
       <ScrollView
@@ -150,14 +178,14 @@ const ProfileScreen = () => {
               <Text style={styles.statValue}>{posts.length}</Text>
               <Text style={styles.statLabel}>posts</Text>
             </View>
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>12.4k</Text>
+            <Pressable style={styles.statItem} onPress={handleOpenFollowers}>
+              <Text style={styles.statValue}>{user?.followerCount ?? 0}</Text>
               <Text style={styles.statLabel}>followers</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>248</Text>
+            </Pressable>
+            <Pressable style={styles.statItem} onPress={handleOpenFollowing}>
+              <Text style={styles.statValue}>{user?.followingCount ?? 0}</Text>
               <Text style={styles.statLabel}>following</Text>
-            </View>
+            </Pressable>
           </View>
         </View>
 
@@ -166,6 +194,22 @@ const ProfileScreen = () => {
           <Text style={styles.bioText}>
             {user?.bio}
           </Text>
+        </View>
+
+        {/* Action buttons */}
+        <View style={styles.actionsRow}>
+          <Pressable
+            style={styles.editProfileBtn}
+            onPress={() => router.push("/edit-profile" as any)}
+          >
+            <Text style={styles.editProfileBtnText}>Chỉnh sửa</Text>
+          </Pressable>
+          <Pressable
+            style={styles.editProfileBtn}
+            onPress={() => router.push("/change-password" as any)}
+          >
+            <Text style={styles.editProfileBtnText}>Đổi mật khẩu</Text>
+          </Pressable>
         </View>
 
         <View style={styles.postsDivider}>
@@ -283,16 +327,26 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     color: "#111",
   },
-  bioMeta: {
-    marginTop: 2,
-    fontSize: 13,
-    color: "#6b7280",
+  actionsRow: {
+    flexDirection: "row",
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingTop: 14,
   },
-  bioLink: {
-    marginTop: 2,
+  editProfileBtn: {
+    flex: 1,
+    minHeight: 34,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#fafafa",
+  },
+  editProfileBtnText: {
     fontSize: 13,
     fontWeight: "600",
-    color: "#2563eb",
+    color: "#111",
   },
   postsDivider: {
     height: 42,

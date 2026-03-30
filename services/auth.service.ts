@@ -6,12 +6,16 @@ export type AuthUser = {
   email: string;
   phoneNumber?: string;
   displayName?: string;
+  fullName?: string;
   avatarUrl?: string;
   status?: string;
   isDeleted?: boolean;
   bio?: string;
+  birthday?: string | null;
   isOnline?: boolean;
   lastOnlineAt?: string;
+  followerCount?: number;
+  followingCount?: number;
   createdAt?: string;
   updatedAt?: string;
 };
