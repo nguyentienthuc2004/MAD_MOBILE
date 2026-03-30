@@ -12,6 +12,7 @@ export type RoomUser = {
     nickname: string;
     avatar?: string;
     role: string;
+    deletedAt?: string;
 };
 
 export type RoomLastMessage = {
@@ -178,6 +179,12 @@ export const chatService = {
                 method: "DELETE",
             },
         );
+    },
+
+    deleteRoom(roomId: string) {
+        return apiAuthRequest<ApiEnvelope<unknown>>(`/chat/rooms/${roomId}/delete`, {
+            method: "DELETE",
+        });
     },
 };
 
