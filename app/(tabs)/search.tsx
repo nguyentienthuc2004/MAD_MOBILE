@@ -361,6 +361,7 @@ const SearchScreen = () => {
     if (!noUsers) {
       return (
         <FlatList
+          key="search-users"
           data={searchResults}
           renderItem={renderUserItem}
           keyExtractor={(item) => item._id}
@@ -387,6 +388,7 @@ const SearchScreen = () => {
     // No users but have posts
     return (
       <FlatList
+        key="search-posts"
         data={searchPostResults}
         renderItem={renderSearchPostGridItem}
         keyExtractor={(item) => item._id}
@@ -451,6 +453,7 @@ const SearchScreen = () => {
           </View>
         ) : (
           <FlatList
+            key="explore"
             data={explorePosts}
             renderItem={renderGridItem}
             keyExtractor={(item) => item._id}
