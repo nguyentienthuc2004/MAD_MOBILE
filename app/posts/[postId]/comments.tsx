@@ -67,6 +67,7 @@ export default function CommentsRoute() {
           replyTarget={replyTarget ?? undefined}
           editTarget={editTarget ?? undefined}
           onCancelReply={() => setReplyTarget(null)}
+          onCancelEdit={() => setEditTarget(null)}
           onCommentAdded={handleCommentAdded}
           onCommentEdited={handleCommentEdited}
         />

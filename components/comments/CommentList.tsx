@@ -18,7 +18,9 @@ import {
 import type { Comment } from "../../services/comment.service";
 import commentService from "../../services/comment.service";
 import { useAuth } from "../../stores/auth.store";
+import BottomSheet from "./BottomSheet";
 import CommentCard from "./CommentCard";
+import ConfirmToast from "./ConfirmToast";
 
 type Props = {
   postId: string;
@@ -59,6 +61,46 @@ function CommentList(
   const [loadingReplies, setLoadingReplies] = useState<Record<string, boolean>>(
     {},
   );
+
+  const [sheetVisible, setSheetVisible] = useState(false);
+  const [sheetComment, setSheetComment] = useState<Comment | null>(null);
+
+  const showSheet = (comment: Comment) => {
+    setSheetComment(comment);
+    setSheetVisible(true);
+  };
+
+  const closeSheet = () => {
+    setSheetVisible(false);
+    setSheetComment(null);
+  };
+
+  const [confirmVisible, setConfirmVisible] = useState(false);
+  const [confirmTargetId, setConfirmTargetId] = useState<string | null>(null);
+
+  const showConfirm = (id: string) => {
+    setConfirmTargetId(id);
+    setConfirmVisible(true);
+  };
+
+  const doConfirmDelete = async () => {
+    const id = confirmTargetId;
+    if (!id || !sheetComment) {
+      setConfirmVisible(false);
+      setConfirmTargetId(null);
+      return;
+    }
+
+    try {
+      await commentService.deleteComment(postId, id);
+      removeComment(id);
+    } catch (err: any) {
+      Alert.alert("Lỗi", err?.message ?? "Không xóa được bình luận");
+    } finally {
+      setConfirmVisible(false);
+      setConfirmTargetId(null);
+    }
+  };
 
   const loadRoot = useCallback(async () => {
     try {
@@ -151,7 +193,6 @@ function CommentList(
 
   useImperativeHandle(ref, () => ({
     addComment: (c: Comment) => {
-      // treat as root when parentCommentId is null/undefined
       if (c.parentCommentId == null) {
         setRootComments((s) => [normalize(c), ...s]);
         return;
@@ -206,7 +247,6 @@ function CommentList(
     openThread: async (rootId: string, scrollToId?: string) => {
       if (!rootId) return;
 
-      // if not loaded, load replies
       if (!repliesCache[rootId]) {
         try {
           setLoadingReplies((s) => ({ ...s, [rootId]: true }));
@@ -224,8 +264,6 @@ function CommentList(
       setExpanded((s) => ({ ...s, [rootId]: true }));
 
       if (scrollToId) {
-        // Retry scrolling until the item is rendered. This handles slower
-        // devices where replies take longer to mount.
         const tryScroll = (attempt = 0) => {
           const data = buildData();
           const idx = data.findIndex(
@@ -255,12 +293,11 @@ function CommentList(
             (r) => (r as any).id === rootId || (r as any)._id === rootId,
           );
           if (hasRoot) {
-            setTimeout(() => tryScroll(), 50);
+            tryScroll();
             return;
           }
           if (attempt >= 12) {
-            // final attempt even if root not present
-            setTimeout(() => tryScroll(), 50);
+            tryScroll();
             return;
           }
           setTimeout(() => ensureRootLoaded(attempt + 1), 150);
@@ -294,46 +331,8 @@ function CommentList(
   };
 
   const handleLongPress = (comment: Comment) => {
-    const id = getId(comment);
-
-    const commentUserId =
-      typeof comment.userId === "string"
-        ? comment.userId
-        : ((comment.userId &&
-            ((comment.userId as any)._id ?? (comment.userId as any).id)) ??
-          undefined);
-
-    const isMine =
-      !!currentUserId && !!commentUserId && currentUserId === commentUserId;
-
-    if (isMine) {
-      Alert.alert("Chọn hành động", undefined, [
-        { text: "Chỉnh sửa", onPress: () => onEditRequested?.(comment) },
-        {
-          text: "Xóa",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await commentService.deleteComment(postId, id);
-              removeComment(id);
-            } catch (err: any) {
-              Alert.alert("Lỗi", err?.message ?? "Không xóa được bình luận");
-            }
-          },
-        },
-        { text: "Hủy", style: "cancel" },
-      ]);
-      return;
-    }
-
-    // not mine -> only reply
-    Alert.alert("Chọn hành động", undefined, [
-      {
-        text: "Trả lời",
-        onPress: () => onReplyRequested?.(comment),
-      },
-      { text: "Hủy", style: "cancel" },
-    ]);
+    // open bottom sheet instead of alert
+    showSheet(comment);
   };
 
   const buildData = (): ListItem[] =>
@@ -355,51 +354,110 @@ function CommentList(
   }
 
   return (
-    <FlatList
-      ref={flatRef}
-      data={buildData()}
-      keyExtractor={(i) => getId(i)}
-      ListHeaderComponent={
-        headerComponent ? () => <>{headerComponent}</> : undefined
-      }
-      renderItem={({ item }) => {
-        if (item.isReply) {
-          const rid = (item as any).id ?? (item as any)._id;
-          return (
-            <View style={styles.replyItem}>
-              <CommentCard
-                comment={item}
-                variant="reply"
-                onPressReply={() => onReplyRequested?.(item)}
-                onLongPress={() => handleLongPress(item)}
-                isHighlighted={!!highlightId && highlightId === rid}
-              />
-            </View>
-          );
+    <>
+      <FlatList
+        ref={flatRef}
+        data={buildData()}
+        keyExtractor={(i) => getId(i)}
+        ListHeaderComponent={
+          headerComponent ? () => <>{headerComponent}</> : undefined
         }
+        renderItem={({ item }) => {
+          if (item.isReply) {
+            const rid = (item as any).id ?? (item as any)._id;
+            return (
+              <View style={styles.replyItem}>
+                <CommentCard
+                  comment={item}
+                  variant="reply"
+                  onPressReply={() => onReplyRequested?.(item)}
+                  onLongPress={() => handleLongPress(item)}
+                  onPress={() => showSheet(item)}
+                  isHighlighted={!!highlightId && highlightId === rid}
+                />
+              </View>
+            );
+          }
 
-        const id = (item as any).id ?? (item as any)._id;
-        return (
-          <CommentCard
-            comment={item}
-            onPressReplies={() => toggleReplies(item)}
-            onPressReply={() => onReplyRequested?.(item)}
-            loadingReplies={!!loadingReplies[id]}
-            isExpanded={!!expanded[id]}
-            onLongPress={() => handleLongPress(item)}
-            isHighlighted={!!highlightId && highlightId === id}
-          />
-        );
-      }}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-      }
-      ListEmptyComponent={() => (
-        <View style={styles.center}>
-          <Text>Chưa có bình luận</Text>
-        </View>
-      )}
-    />
+          const id = (item as any).id ?? (item as any)._id;
+          return (
+            <CommentCard
+              comment={item}
+              onPressReplies={() => toggleReplies(item)}
+              onPressReply={() => onReplyRequested?.(item)}
+              loadingReplies={!!loadingReplies[id]}
+              isExpanded={!!expanded[id]}
+              onLongPress={() => handleLongPress(item)}
+              onPress={() => showSheet(item)}
+              isHighlighted={!!highlightId && highlightId === id}
+            />
+          );
+        }}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+        ListEmptyComponent={() => (
+          <View style={styles.center}>
+            <Text>Chưa có bình luận</Text>
+          </View>
+        )}
+      />
+      <BottomSheet
+        visible={sheetVisible}
+        onClose={closeSheet}
+        options={
+          sheetComment
+            ? (() => {
+                const comment = sheetComment;
+                const id = getId(comment);
+
+                const commentUserId =
+                  typeof comment.userId === "string"
+                    ? comment.userId
+                    : ((comment.userId &&
+                        ((comment.userId as any)._id ??
+                          (comment.userId as any).id)) ??
+                      undefined);
+
+                const isMine =
+                  !!currentUserId &&
+                  !!commentUserId &&
+                  currentUserId === commentUserId;
+
+                const opts: any[] = [];
+
+                if (isMine) {
+                  opts.push({
+                    label: "Chỉnh sửa",
+                    onPress: () => onEditRequested?.(comment),
+                  });
+                  opts.push({
+                    label: "Xóa",
+                    style: { color: "red" },
+                    onPress: () => {
+                      const cid = id;
+                      setTimeout(() => showConfirm(cid), 80);
+                    },
+                  });
+                } else {
+                  opts.push({
+                    label: "Trả lời",
+                    onPress: () => onReplyRequested?.(comment),
+                  });
+                }
+
+                return opts;
+              })()
+            : []
+        }
+      />
+      <ConfirmToast
+        visible={confirmVisible}
+        message="Bạn có chắc muốn xóa bình luận này không?"
+        onCancel={() => setConfirmVisible(false)}
+        onConfirm={doConfirmDelete}
+      />
+    </>
   );
 }
 

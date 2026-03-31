@@ -1,13 +1,13 @@
 import React, { useEffect, useState } from "react";
 import {
-    Alert,
-    KeyboardAvoidingView,
-    Platform,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import type { Comment } from "../../services/comment.service";
 import commentService from "../../services/comment.service";
@@ -17,6 +17,7 @@ type Props = {
   replyTarget?: Comment | null;
   editTarget?: Comment | null;
   onCancelReply?: () => void;
+  onCancelEdit?: () => void;
   onCommentAdded?: (c: Comment) => void;
   onCommentEdited?: (c: Comment) => void;
 };
@@ -26,6 +27,7 @@ export default function CommentInput({
   replyTarget,
   editTarget,
   onCancelReply,
+  onCancelEdit,
   onCommentAdded,
   onCommentEdited,
 }: Props) {
@@ -93,7 +95,20 @@ export default function CommentInput({
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
       <View style={styles.wrapper}>
-        {replyTarget ? (
+        {editTarget ? (
+          <View style={styles.replyRow}>
+            <Text style={styles.replyText}>{`Đang chỉnh sửa`}</Text>
+            <TouchableOpacity
+              onPress={() => {
+                setText("");
+                onCancelEdit?.();
+              }}
+              style={styles.cancelBtn}
+            >
+              <Text style={styles.cancelText}>Hủy</Text>
+            </TouchableOpacity>
+          </View>
+        ) : replyTarget ? (
           <View style={styles.replyRow}>
             <Text
               style={styles.replyText}

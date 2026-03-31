@@ -19,6 +19,7 @@ type Props = {
   variant?: "reply" | "root";
   onPressReply?: () => void;
   onLongPress?: () => void;
+  onPress?: () => void;
   onPressReplies?: () => void;
   isExpanded?: boolean;
   loadingReplies?: boolean;
@@ -44,6 +45,7 @@ export default function CommentCard({
   onPressReply,
   onLongPress,
   onPressReplies,
+  onPress,
   isExpanded,
   loadingReplies,
   isHighlighted,
@@ -122,6 +124,7 @@ export default function CommentCard({
     <Animated.View style={wrapperStyle}>
       <Pressable
         onLongPress={onLongPress}
+        onPress={onPress}
         style={
           isHighlighted
             ? [

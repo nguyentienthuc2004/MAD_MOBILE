@@ -197,7 +197,13 @@ authClient.interceptors.response.use(
     if (!nextAccessToken) {
       console.log("[api] refresh fail");
       await apiAuthConfig.onAuthFailure?.();
-      return Promise.reject(toApiError(error));
+
+      return Promise.reject(
+        new ApiError(
+          "Bạn đã hết phiên đăng nhập. Vui lòng đăng nhập lại.",
+          401,
+        ),
+      );
     }
 
     console.log("[api] refresh ok retry");

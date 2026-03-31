@@ -31,9 +31,11 @@ const ProfileScreen = () => {
   const { request, loading, error } = useApi<ApiResponse<ApiPost[]>>();
   const [posts, setPosts] = useState<ApiPost[]>([]);
   const [likedPosts, setLikedPosts] = useState<ApiPost[]>([]);
-  const [tab, setTab] = useState<'my' | 'liked'>('my');
+  const [tab, setTab] = useState<"my" | "liked">("my");
   const [refreshing, setRefreshing] = useState(false);
-  const [revealedSensitiveByPostId, setRevealedSensitiveByPostId] = useState<Record<string, boolean>>({});
+  const [revealedSensitiveByPostId, setRevealedSensitiveByPostId] = useState<
+    Record<string, boolean>
+  >({});
   const logout = useAuth((state) => state.logout);
 
   const fetchPosts = useCallback(async () => {
@@ -61,7 +63,7 @@ const ProfileScreen = () => {
   }, [user?._id]);
 
   useEffect(() => {
-    if (tab === 'my') void fetchPosts();
+    if (tab === "my") void fetchPosts();
     else void fetchLikedPosts();
   }, [tab, fetchPosts, fetchLikedPosts]);
 
@@ -69,7 +71,7 @@ const ProfileScreen = () => {
     try {
       setRefreshing(true);
       await refetchMe();
-      if (tab === 'my') await fetchPosts();
+      if (tab === "my") await fetchPosts();
       else await fetchLikedPosts();
     } finally {
       setRefreshing(false);
@@ -79,7 +81,7 @@ const ProfileScreen = () => {
   const feedPosts = useMemo<FeedPost[]>(() => {
     const displayName = user?.displayName || user?.username || "Bạn";
     const avatarUrl = user?.avatarUrl || FALLBACK_POST_IMAGE;
-    const source = tab === 'my' ? posts : likedPosts;
+    const source = tab === "my" ? posts : likedPosts;
     return source.map((post) => ({
       id: post._id,
       userName: displayName,
@@ -89,8 +91,14 @@ const ProfileScreen = () => {
       likes: post.likeCount ?? 0,
       isSensitive: Boolean(post.isSensitive),
     }));
-  }, [tab, posts, likedPosts, user?.avatarUrl, user?.displayName, user?.username]);
-
+  }, [
+    tab,
+    posts,
+    likedPosts,
+    user?.avatarUrl,
+    user?.displayName,
+    user?.username,
+  ]);
 
   // Mở post, truyền đúng authorId nếu là tab liked
   const handleOpenPost = (postId: string, authorId?: string) => {
@@ -104,12 +112,13 @@ const ProfileScreen = () => {
   };
 
   const handlePressGridPost = (item: FeedPost) => {
-    const isBlocked = Boolean(item.isSensitive) && !revealedSensitiveByPostId[item.id];
+    const isBlocked =
+      Boolean(item.isSensitive) && !revealedSensitiveByPostId[item.id];
     // Nếu là tab liked thì lấy authorId từ likedPosts, còn tab my thì lấy user._id
     let authorId = user?._id;
-    if (tab === 'liked') {
-      const liked = likedPosts.find(p => p._id === item.id);
-      authorId = liked?.userId || '';
+    if (tab === "liked") {
+      const liked = likedPosts.find((p) => p._id === item.id);
+      authorId = liked?.userId || "";
     }
     if (!isBlocked) {
       handleOpenPost(item.id, authorId);
@@ -178,8 +187,11 @@ const ProfileScreen = () => {
             <Feather name="plus-square" size={22} color="#111" />
           </Pressable>
 
-          <Pressable style={styles.headerIconButton} onPress={logout}>
-            <Ionicons name="log-out-outline" size={22} color="#111" />
+          <Pressable
+            style={styles.headerIconButton}
+            onPress={() => router.push("/account-settings")}
+          >
+            <Feather name="menu" size={22} color="#111" />
           </Pressable>
         </View>
 
@@ -209,49 +221,56 @@ const ProfileScreen = () => {
 
         <View style={styles.bioWrap}>
           <Text style={styles.displayName}>{user?.displayName}</Text>
-          <Text style={styles.bioText}>
-            {user?.bio}
-          </Text>
+          <Text style={styles.bioText}>{user?.bio}</Text>
         </View>
 
-
-        {/* Action buttons */}
-        <View style={styles.actionsRow}>
-          <Pressable
-            style={styles.editProfileBtn}
-            onPress={() => router.push("/edit-profile" as any)}
-          >
-            <Text style={styles.editProfileBtnText}>Chỉnh sửa</Text>
-          </Pressable>
-          <Pressable
-            style={styles.editProfileBtn}
-            onPress={() => router.push("/change-password" as any)}
-          >
-            <Text style={styles.editProfileBtnText}>Đổi mật khẩu</Text>
-          </Pressable>
-        </View>
+        {/* Action buttons moved to Account Settings */}
 
         {/* Tab buttons dưới action buttons */}
         <View style={styles.postsDivider}>
-          <View style={{ flexDirection: 'row', width: '100%' }}>
+          <View style={{ flexDirection: "row", width: "100%" }}>
             <Pressable
-              style={[styles.tabBtn, tab === 'my' && styles.tabBtnActive]}
-              onPress={() => setTab('my')}
+              style={[styles.tabBtn, tab === "my" && styles.tabBtnActive]}
+              onPress={() => setTab("my")}
             >
-              <Ionicons name="grid-outline" size={20} color={tab === 'my' ? '#111' : '#aaa'} />
-              <Text style={[styles.tabBtnText, tab === 'my' && styles.tabBtnTextActive]}>Bài viết</Text>
+              <Ionicons
+                name="grid-outline"
+                size={20}
+                color={tab === "my" ? "#111" : "#aaa"}
+              />
+              <Text
+                style={[
+                  styles.tabBtnText,
+                  tab === "my" && styles.tabBtnTextActive,
+                ]}
+              >
+                Bài viết
+              </Text>
             </Pressable>
             <Pressable
-              style={[styles.tabBtn, tab === 'liked' && styles.tabBtnActive]}
-              onPress={() => setTab('liked')}
+              style={[styles.tabBtn, tab === "liked" && styles.tabBtnActive]}
+              onPress={() => setTab("liked")}
             >
-              <Ionicons name="heart-outline" size={20} color={tab === 'liked' ? '#e11d48' : '#aaa'} />
-              <Text style={[styles.tabBtnText, tab === 'liked' && styles.tabBtnTextActive]}>Đã thích</Text>
+              <Ionicons
+                name="heart-outline"
+                size={20}
+                color={tab === "liked" ? "#e11d48" : "#aaa"}
+              />
+              <Text
+                style={[
+                  styles.tabBtnText,
+                  tab === "liked" && styles.tabBtnTextActive,
+                ]}
+              >
+                Đã thích
+              </Text>
             </Pressable>
           </View>
         </View>
 
-        {loading && !refreshing ? <Text style={styles.stateText}>Đang tải bài viết...</Text> : null}
+        {loading && !refreshing ? (
+          <Text style={styles.stateText}>Đang tải bài viết...</Text>
+        ) : null}
         {error ? <Text style={styles.stateText}>{error}</Text> : null}
 
         {!loading && !error && feedPosts.length === 0 ? (
@@ -324,24 +343,24 @@ const styles = StyleSheet.create({
   avatar: {
     tabBtn: {
       flex: 1,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
       paddingVertical: 8,
       borderBottomWidth: 2,
-      borderColor: 'transparent',
+      borderColor: "transparent",
     },
     tabBtnActive: {
-      borderColor: '#111',
+      borderColor: "#111",
     },
     tabBtnText: {
       marginLeft: 6,
       fontSize: 14,
-      color: '#aaa',
-      fontWeight: '600',
+      color: "#aaa",
+      fontWeight: "600",
     },
     tabBtnTextActive: {
-      color: '#111',
+      color: "#111",
     },
     width: 86,
     height: 86,
@@ -413,29 +432,29 @@ const styles = StyleSheet.create({
     borderColor: "#e5e7eb",
     alignItems: "center",
     justifyContent: "center",
-    flexDirection: 'row',
+    flexDirection: "row",
     paddingHorizontal: 16,
   },
   tabBtn: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     paddingVertical: 8,
     borderBottomWidth: 2,
-    borderColor: 'transparent',
+    borderColor: "transparent",
   },
   tabBtnActive: {
-    borderColor: '#111',
+    borderColor: "#111",
   },
   tabBtnText: {
     marginLeft: 6,
     fontSize: 14,
-    color: '#aaa',
-    fontWeight: '600',
+    color: "#aaa",
+    fontWeight: "600",
   },
   tabBtnTextActive: {
-    color: '#111',
+    color: "#111",
   },
   gridWrap: {
     flexDirection: "row",

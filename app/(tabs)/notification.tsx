@@ -8,17 +8,29 @@ import {
   StatusBar,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from "react-native";
 
 const NotificationScreen: React.FC = () => {
   const unread = useNotifications((s) => s.unreadCount);
+  const markAll = useNotifications((s) => s.markAllRead);
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Thông báo</Text>
-        <NotificationBadge count={unread} />
+
+        <TouchableOpacity
+          activeOpacity={0.7}
+          style={styles.markAllBtn}
+          onPress={() => void markAll()}
+        >
+          <Text style={styles.markAllText}>Đánh dấu tất cả là đã đọc</Text>
+          <View style={styles.badgeWrap} pointerEvents="none">
+            <NotificationBadge count={unread} />
+          </View>
+        </TouchableOpacity>
       </View>
 
       <View style={styles.listWrap}>
@@ -41,6 +53,15 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   headerTitle: { fontSize: 18, fontWeight: "700" },
+  markAllBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: "#f2f2f2",
+    borderRadius: 8,
+    position: "relative",
+  },
+  markAllText: { fontSize: 13, fontWeight: "600", color: "#333" },
+  badgeWrap: { position: "absolute", top: -6, right: -6 },
   listWrap: { flex: 1 },
 });
 
