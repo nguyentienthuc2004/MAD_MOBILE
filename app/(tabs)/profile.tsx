@@ -2,6 +2,7 @@ import { Post as FeedPost } from "@/components/PostCard";
 import { useApi } from "@/hooks/useApi";
 import { useAuth } from "@/hooks/useAuth";
 import { ApiResponse } from "@/services/api";
+import likedPostService from "@/services/liked-post.service";
 import { Post as ApiPost, postService } from "@/services/post.service";
 import { Feather, Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -29,46 +30,57 @@ const ProfileScreen = () => {
   const refetchMe = useAuth((state) => state.refetchMe);
   const { request, loading, error } = useApi<ApiResponse<ApiPost[]>>();
   const [posts, setPosts] = useState<ApiPost[]>([]);
+  const [likedPosts, setLikedPosts] = useState<ApiPost[]>([]);
+  const [tab, setTab] = useState<'my' | 'liked'>('my');
   const [refreshing, setRefreshing] = useState(false);
-  const [revealedSensitiveByPostId, setRevealedSensitiveByPostId] = useState<
-    Record<string, boolean>
-  >({});
+  const [revealedSensitiveByPostId, setRevealedSensitiveByPostId] = useState<Record<string, boolean>>({});
   const logout = useAuth((state) => state.logout);
 
   const fetchPosts = useCallback(async () => {
     const userId = user?._id;
-
     if (!userId) {
       setPosts([]);
       return;
     }
-
-    console.log("Fetching posts for userId:", userId);
     const res = await request(() => postService.getPostsByUserId(userId));
     if (!res?.data) return;
     setPosts(res.data);
     setRevealedSensitiveByPostId({});
   }, [request, user?._id]);
 
+  const fetchLikedPosts = useCallback(async () => {
+    const userId = user?._id;
+    if (!userId) {
+      setLikedPosts([]);
+      return;
+    }
+    const res = await likedPostService.getLikedPostsByUser(userId);
+    if (!res?.data) return;
+    setLikedPosts(res.data);
+    setRevealedSensitiveByPostId({});
+  }, [user?._id]);
+
   useEffect(() => {
-    void fetchPosts();
-  }, [fetchPosts]);
+    if (tab === 'my') void fetchPosts();
+    else void fetchLikedPosts();
+  }, [tab, fetchPosts, fetchLikedPosts]);
 
   const handleRefresh = useCallback(async () => {
     try {
       setRefreshing(true);
       await refetchMe();
-      await fetchPosts();
+      if (tab === 'my') await fetchPosts();
+      else await fetchLikedPosts();
     } finally {
       setRefreshing(false);
     }
-  }, [fetchPosts, refetchMe]);
+  }, [tab, fetchPosts, fetchLikedPosts, refetchMe]);
 
   const feedPosts = useMemo<FeedPost[]>(() => {
     const displayName = user?.displayName || user?.username || "Bạn";
     const avatarUrl = user?.avatarUrl || FALLBACK_POST_IMAGE;
-
-    return posts.map((post) => ({
+    const source = tab === 'my' ? posts : likedPosts;
+    return source.map((post) => ({
       id: post._id,
       userName: displayName,
       userAvatar: avatarUrl,
@@ -77,26 +89,32 @@ const ProfileScreen = () => {
       likes: post.likeCount ?? 0,
       isSensitive: Boolean(post.isSensitive),
     }));
-  }, [posts, user?.avatarUrl, user?.displayName, user?.username]);
+  }, [tab, posts, likedPosts, user?.avatarUrl, user?.displayName, user?.username]);
 
-  const handleOpenPost = (postId: string) => {
+
+  // Mở post, truyền đúng authorId nếu là tab liked
+  const handleOpenPost = (postId: string, authorId?: string) => {
     void router.push({
       pathname: "/post-detail",
       params: {
         postId,
-        authorId: user?._id ?? "",
+        authorId: authorId || user?._id || "",
       },
     });
   };
 
   const handlePressGridPost = (item: FeedPost) => {
     const isBlocked = Boolean(item.isSensitive) && !revealedSensitiveByPostId[item.id];
-
+    // Nếu là tab liked thì lấy authorId từ likedPosts, còn tab my thì lấy user._id
+    let authorId = user?._id;
+    if (tab === 'liked') {
+      const liked = likedPosts.find(p => p._id === item.id);
+      authorId = liked?.userId || '';
+    }
     if (!isBlocked) {
-      handleOpenPost(item.id);
+      handleOpenPost(item.id, authorId);
       return;
     }
-
     Alert.alert(
       "Nội dung nhạy cảm",
       "Bài viết này có thể chứa hình ảnh không phù hợp với một số người xem. Bạn có muốn tiếp tục không?",
@@ -109,7 +127,7 @@ const ProfileScreen = () => {
               ...prev,
               [item.id]: true,
             }));
-            handleOpenPost(item.id);
+            handleOpenPost(item.id, authorId);
           },
         },
       ],
@@ -196,6 +214,7 @@ const ProfileScreen = () => {
           </Text>
         </View>
 
+
         {/* Action buttons */}
         <View style={styles.actionsRow}>
           <Pressable
@@ -212,8 +231,24 @@ const ProfileScreen = () => {
           </Pressable>
         </View>
 
+        {/* Tab buttons dưới action buttons */}
         <View style={styles.postsDivider}>
-          <Ionicons name="grid-outline" size={20} color="#111" />
+          <View style={{ flexDirection: 'row', width: '100%' }}>
+            <Pressable
+              style={[styles.tabBtn, tab === 'my' && styles.tabBtnActive]}
+              onPress={() => setTab('my')}
+            >
+              <Ionicons name="grid-outline" size={20} color={tab === 'my' ? '#111' : '#aaa'} />
+              <Text style={[styles.tabBtnText, tab === 'my' && styles.tabBtnTextActive]}>Bài viết</Text>
+            </Pressable>
+            <Pressable
+              style={[styles.tabBtn, tab === 'liked' && styles.tabBtnActive]}
+              onPress={() => setTab('liked')}
+            >
+              <Ionicons name="heart-outline" size={20} color={tab === 'liked' ? '#e11d48' : '#aaa'} />
+              <Text style={[styles.tabBtnText, tab === 'liked' && styles.tabBtnTextActive]}>Đã thích</Text>
+            </Pressable>
+          </View>
         </View>
 
         {loading && !refreshing ? <Text style={styles.stateText}>Đang tải bài viết...</Text> : null}
@@ -285,7 +320,29 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 10,
   },
+  // Đưa các style này vào đúng chỗ bên dưới
   avatar: {
+    tabBtn: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 8,
+      borderBottomWidth: 2,
+      borderColor: 'transparent',
+    },
+    tabBtnActive: {
+      borderColor: '#111',
+    },
+    tabBtnText: {
+      marginLeft: 6,
+      fontSize: 14,
+      color: '#aaa',
+      fontWeight: '600',
+    },
+    tabBtnTextActive: {
+      color: '#111',
+    },
     width: 86,
     height: 86,
     borderRadius: 43,
@@ -356,6 +413,29 @@ const styles = StyleSheet.create({
     borderColor: "#e5e7eb",
     alignItems: "center",
     justifyContent: "center",
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+  },
+  tabBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    borderBottomWidth: 2,
+    borderColor: 'transparent',
+  },
+  tabBtnActive: {
+    borderColor: '#111',
+  },
+  tabBtnText: {
+    marginLeft: 6,
+    fontSize: 14,
+    color: '#aaa',
+    fontWeight: '600',
+  },
+  tabBtnTextActive: {
+    color: '#111',
   },
   gridWrap: {
     flexDirection: "row",
