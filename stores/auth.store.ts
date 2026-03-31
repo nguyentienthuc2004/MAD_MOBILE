@@ -188,7 +188,7 @@ export const useAuth = create<AuthState>((set, get) => ({
   },
 }));
 
-const clearLocalSession = async () => {
+const clearLocalSession = async (message: string | null = null) => {
   await Promise.all([
     SecureStore.deleteItemAsync(ACCESS_TOKEN_KEY),
     SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY),
@@ -199,7 +199,7 @@ const clearLocalSession = async () => {
     accessToken: null,
     refreshToken: null,
     isAuthenticated: false,
-    error: null,
+    error: message ?? null,
   });
 };
 
@@ -233,6 +233,8 @@ configureApiAuth({
     }
   },
   onAuthFailure: async () => {
-    await clearLocalSession();
+    await clearLocalSession(
+      "Bạn đã hết phiên đăng nhập. Vui lòng đăng nhập lại.",
+    );
   },
 });

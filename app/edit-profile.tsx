@@ -1,19 +1,22 @@
 import { useAuth } from "@/hooks/useAuth";
-import { userService, type UpdateProfilePayload } from "@/services/user.service";
+import {
+    userService,
+    type UpdateProfilePayload,
+} from "@/services/user.service";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  Image,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
+    ActivityIndicator,
+    Alert,
+    Image,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -56,7 +59,10 @@ export default function EditProfileScreen() {
   const handlePickAvatar = async () => {
     const permResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permResult.granted) {
-      Alert.alert("Quyền truy cập", "Vui lòng cấp quyền truy cập thư viện ảnh.");
+      Alert.alert(
+        "Quyền truy cập",
+        "Vui lòng cấp quyền truy cập thư viện ảnh.",
+      );
       return;
     }
 
@@ -92,8 +98,10 @@ export default function EditProfileScreen() {
 
       // Track text field changes
       if (fullName.trim() !== (user?.fullName ?? "")) changes.push("Tên");
-      if (displayName.trim() !== (user?.displayName ?? "")) changes.push("Tên hiển thị");
-      if (phoneNumber.trim() !== (user?.phoneNumber ?? "")) changes.push("Số điện thoại");
+      if (displayName.trim() !== (user?.displayName ?? ""))
+        changes.push("Tên hiển thị");
+      if (phoneNumber.trim() !== (user?.phoneNumber ?? ""))
+        changes.push("Số điện thoại");
       if (bio.trim() !== (user?.bio ?? "")) changes.push("Giới thiệu");
 
       // Parse birthday from dd/mm/yyyy to ISO
@@ -134,7 +142,7 @@ export default function EditProfileScreen() {
     } catch (err: any) {
       Alert.alert(
         "Lỗi",
-        err?.message || "Không thể cập nhật thông tin. Vui lòng thử lại."
+        err?.message || "Không thể cập nhật thông tin. Vui lòng thử lại.",
       );
     } finally {
       setIsSubmitting(false);
@@ -351,7 +359,7 @@ const styles = StyleSheet.create({
     marginTop: 28,
     height: 48,
     borderRadius: 24,
-    backgroundColor: "#ef4444",
+    backgroundColor: "#3b82f6",
     alignItems: "center",
     justifyContent: "center",
   },
