@@ -1,4 +1,4 @@
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
 import {
   Alert,
@@ -74,7 +74,9 @@ export default function ResetPasswordScreen() {
       behavior={Platform.OS === "ios" ? "padding" : undefined}
       style={styles.container}
     >
+      <Stack.Screen options={{ title: "Đặt lại mật khẩu" }} />
       <View style={styles.card}>
+        <Text style={styles.title}>Nhập mật khẩu mới</Text>
         <TextInput
           placeholder="Mật khẩu mới"
           secureTextEntry
@@ -125,6 +127,12 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     padding: 12,
     borderRadius: 10,
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#111",
+    marginBottom: 4,
   },
   input: {
     borderWidth: 1,
