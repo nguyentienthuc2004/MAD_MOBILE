@@ -95,6 +95,12 @@ type RoomAvatarChangedEvent = {
     newAvatar: string;
 };
 
+type MemberLeftEvent = {
+    roomId: string;
+    userId: string;
+    userName?: string;
+};
+
 const dedupeMessagesById = (items: ChatMessage[]): ChatMessage[] => {
     const uniqueById = new Map<string, ChatMessage>();
 
@@ -929,6 +935,49 @@ export default function ChatRoomScreen() {
             }
         };
 
+        const handleMemberLeft = (payload: MemberLeftEvent) => {
+            try {
+                if (!payload || String(payload.roomId) !== roomKey) return;
+
+                const meIdStr = meId ? String(meId) : null;
+                const leaverId = String(payload.userId);
+                const isMeLeaver = !!meIdStr && meIdStr === leaverId;
+
+                const name =
+                    payload.userName ||
+                    room?.users?.find((u) => String(u.user_id) === leaverId)?.nickname ||
+                    "Một thành viên";
+
+                const content = isMeLeaver
+                    ? "Bạn đã rời khỏi nhóm"
+                    : `${name} đã rời khỏi nhóm`;
+
+                const systemMsg: ChatMessage = {
+                    id: `member-left-${Date.now()}`,
+                    content,
+                    isMine: false,
+                    senderId: "system",
+                    createdAt: new Date().toLocaleTimeString("vi-VN", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                    }),
+                    kind: "system",
+                };
+
+                setMessages((prev) => [...prev, systemMsg]);
+
+                setRoom((prev) => {
+                    if (!prev || !Array.isArray(prev.users)) return prev;
+                    return {
+                        ...prev,
+                        users: prev.users.filter((u) => String(u.user_id) !== leaverId),
+                    };
+                });
+            } catch (e) {
+                console.log("[CHAT] SERVER_MEMBER_LEFT handle error", e);
+            }
+        };
+
         // Tham gia room và lắng nghe sự kiện, gửi kèm userId để backend kiểm tra
         console.log("[CHAT] JOIN_ROOM emit", { roomId: roomKey, userId: meId });
         socket.emit("JOIN_ROOM", { roomId: roomKey, userId: meId });
@@ -940,6 +989,7 @@ export default function ChatRoomScreen() {
         socket.on("SERVER_MEMBER_ROLE_CHANGED", handleMemberRoleChanged);
         socket.on("SERVER_ROOM_TITLE_CHANGED", handleRoomTitleChanged);
         socket.on("SERVER_ROOM_AVATAR_CHANGED", handleRoomAvatarChanged);
+        socket.on("SERVER_MEMBER_LEFT", handleMemberLeft);
         socket.on("SERVER_TYPING", handleTyping);
         socket.on("SERVER_STOP_TYPING", handleStopTyping);
         socket.on("SERVER_MESSAGE_DELETED", handleMessageDeleted);
@@ -956,6 +1006,7 @@ export default function ChatRoomScreen() {
             socket.off("SERVER_MEMBER_ROLE_CHANGED", handleMemberRoleChanged);
             socket.off("SERVER_ROOM_TITLE_CHANGED", handleRoomTitleChanged);
             socket.off("SERVER_ROOM_AVATAR_CHANGED", handleRoomAvatarChanged);
+            socket.off("SERVER_MEMBER_LEFT", handleMemberLeft);
             socket.off("SERVER_TYPING", handleTyping);
             socket.off("SERVER_STOP_TYPING", handleStopTyping);
             socket.off("SERVER_MESSAGE_DELETED", handleMessageDeleted);
