@@ -1,13 +1,13 @@
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import {
-    KeyboardAvoidingView,
-    Platform,
-    Pressable,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
 import { authService } from "../../services/auth.service";
 
@@ -90,7 +90,10 @@ export default function VerifyOtpScreen() {
       behavior={Platform.OS === "ios" ? "padding" : undefined}
       style={styles.container}
     >
+      <Stack.Screen options={{ title: "Xác nhận OTP" }} />
       <View style={styles.card}>
+        <Text style={styles.title}>Xác thực mã OTP</Text>
+        <Text style={styles.sentInfo}>{`Đã gửi mã OTP đến ${email}`}</Text>
         <View style={styles.otpRow}>
           {digits.map((d, i) => (
             <TextInput
@@ -167,6 +170,17 @@ const styles = StyleSheet.create({
   },
   mutedText: {
     color: "#6b7280",
+  },
+  sentInfo: {
+    color: "#374151",
+    fontSize: 14,
+    marginBottom: 6,
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#111",
+    marginBottom: 4,
   },
   button: {
     borderRadius: 8,

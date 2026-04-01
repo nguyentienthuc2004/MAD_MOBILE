@@ -85,7 +85,7 @@ function CommentList(
 
   const doConfirmDelete = async () => {
     const id = confirmTargetId;
-    if (!id || !sheetComment) {
+    if (!id) {
       setConfirmVisible(false);
       setConfirmTargetId(null);
       return;
