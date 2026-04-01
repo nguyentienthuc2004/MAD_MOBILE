@@ -89,6 +89,7 @@ const ProfileScreen = () => {
       images: post.images?.length ? post.images : [FALLBACK_POST_IMAGE],
       caption: post.caption ?? "",
       likes: post.likeCount ?? 0,
+      commentCount: post.commentCount ?? 0,
       isSensitive: Boolean(post.isSensitive),
     }));
   }, [
