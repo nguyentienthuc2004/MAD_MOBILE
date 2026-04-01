@@ -77,6 +77,7 @@ export const authService = {
     return apiAuthRequest<ApiResponse<{ message?: string }>>("/auth/logout", {
       method: "POST",
       body: refreshToken ? { refreshToken } : {},
+      skipAuthRefresh: true,
     });
   },
 
@@ -85,6 +86,7 @@ export const authService = {
       "/auth/logout-all",
       {
         method: "POST",
+        skipAuthRefresh: true,
       },
     );
   },
