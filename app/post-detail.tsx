@@ -9,14 +9,14 @@ import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-    Alert,
-    FlatList,
-    Pressable,
-    RefreshControl,
-    StyleSheet,
-    Text,
-    View,
-    type ViewToken,
+	Alert,
+	FlatList,
+	Pressable,
+	RefreshControl,
+	StyleSheet,
+	Text,
+	View,
+	type ViewToken,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -90,7 +90,7 @@ export default function PostDetailScreen() {
       }
     }
 
-    if (!ownerId && meId) {
+    if (!ownerId) {
       ownerId = meId;
     }
 
