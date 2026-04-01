@@ -184,7 +184,7 @@ export const useAuth = create<AuthState>((set, get) => ({
       } catch {}
     }
 
-    await clearLocalSession();
+    await clearLocalSession("Bạn đã đăng xuất ra khỏi tất cả thiết bị.");
   },
 }));
 

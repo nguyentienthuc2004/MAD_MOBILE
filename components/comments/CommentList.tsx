@@ -372,7 +372,6 @@ function CommentList(
                   variant="reply"
                   onPressReply={() => onReplyRequested?.(item)}
                   onLongPress={() => handleLongPress(item)}
-                  onPress={() => showSheet(item)}
                   isHighlighted={!!highlightId && highlightId === rid}
                 />
               </View>
@@ -388,7 +387,6 @@ function CommentList(
               loadingReplies={!!loadingReplies[id]}
               isExpanded={!!expanded[id]}
               onLongPress={() => handleLongPress(item)}
-              onPress={() => showSheet(item)}
               isHighlighted={!!highlightId && highlightId === id}
             />
           );
