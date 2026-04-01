@@ -1,12 +1,15 @@
 import type { RoomUser } from "@/services/chat.service";
 import { chatService } from "@/services/chat.service";
+import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { FlatList, Image, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function SearchMessagesScreen() {
     const router = useRouter();
     const { roomId } = useLocalSearchParams<{ roomId: string }>();
+    const insets = useSafeAreaInsets();
     const [keyword, setKeyword] = useState("");
     const [results, setResults] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
@@ -37,10 +40,10 @@ export default function SearchMessagesScreen() {
     };
 
     return (
-        <View style={styles.container}>
-            <View style={styles.header}>
+        <SafeAreaView style={styles.container} edges={["bottom"]}>
+            <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
                 <Pressable style={styles.backButton} onPress={() => router.back()}>
-                    <Text style={styles.backText}>{"<"}</Text>
+                    <Ionicons name="chevron-back" size={24} color="#111" />
                 </Pressable>
                 <Text style={styles.headerTitle}>Tìm tin nhắn</Text>
             </View>
@@ -63,7 +66,13 @@ export default function SearchMessagesScreen() {
                 data={results}
                 keyExtractor={(item) => item._id}
                 style={{ flex: 1 }}
-                contentContainerStyle={{ padding: 16 }}
+                contentContainerStyle={{
+                    paddingHorizontal: 16,
+                    paddingTop: 8,
+                    paddingBottom: 24,
+                    flexGrow: 1,
+                }}
+                keyboardShouldPersistTaps="handled"
                 ListEmptyComponent={
                     !loading && keyword.trim()
                         ? <Text style={styles.empty}>Không tìm thấy tin nhắn phù hợp.</Text>
@@ -101,7 +110,7 @@ export default function SearchMessagesScreen() {
                     );
                 }}
             />
-        </View>
+        </SafeAreaView>
     );
 }
 
@@ -114,18 +123,13 @@ const styles = StyleSheet.create({
         flexDirection: "row",
         alignItems: "center",
         paddingHorizontal: 12,
-        paddingTop: 16,
-        paddingBottom: 8,
+        paddingBottom: 10,
         borderBottomWidth: StyleSheet.hairlineWidth,
         borderBottomColor: "#e5e5e5",
     },
     backButton: {
         paddingRight: 12,
         paddingVertical: 4,
-    },
-    backText: {
-        fontSize: 20,
-        color: "#0a84ff",
     },
     headerTitle: {
         fontSize: 17,
@@ -136,7 +140,9 @@ const styles = StyleSheet.create({
     inputWrap: {
         flexDirection: "row",
         alignItems: "center",
-        padding: 16,
+        paddingHorizontal: 16,
+        paddingTop: 12,
+        paddingBottom: 12,
         gap: 8,
     },
     input: {
@@ -168,7 +174,7 @@ const styles = StyleSheet.create({
     empty: {
         color: "#888",
         textAlign: "center",
-        marginTop: 32,
+        marginTop: 24,
         fontSize: 15,
     },
     resultItem: {
