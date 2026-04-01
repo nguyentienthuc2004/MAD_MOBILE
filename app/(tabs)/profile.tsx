@@ -220,7 +220,7 @@ const ProfileScreen = () => {
         </View>
 
         <View style={styles.bioWrap}>
-          <Text style={styles.displayName}>{user?.displayName}</Text>
+          <Text style={styles.displayName}>{user?.username}</Text>
           <Text style={styles.bioText}>{user?.bio}</Text>
         </View>
 
