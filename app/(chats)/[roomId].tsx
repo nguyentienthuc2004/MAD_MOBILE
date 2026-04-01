@@ -56,6 +56,51 @@ type MessageDeletedEvent = {
     deletedBy: string;
 };
 
+type MembersAddedEvent = {
+    roomId: string;
+    adderId?: string;
+    adderName?: string;
+    members?: { userId: string; nickname?: string; avatar?: string; role?: string }[];
+};
+
+type MemberRemovedEvent = {
+    roomId: string;
+    changerId?: string;
+    changerName?: string;
+    targetId: string;
+    targetName?: string;
+};
+
+type MemberRoleChangedEvent = {
+    roomId: string;
+    changerId?: string;
+    changerName?: string;
+    targetId?: string;
+    targetName?: string;
+    newRole?: string;
+    changes?: { userId: string; newRole: string }[];
+};
+
+type RoomTitleChangedEvent = {
+    roomId: string;
+    changerId?: string;
+    changerName?: string;
+    newTitle: string;
+};
+
+type RoomAvatarChangedEvent = {
+    roomId: string;
+    changerId?: string;
+    changerName?: string;
+    newAvatar: string;
+};
+
+type MemberLeftEvent = {
+    roomId: string;
+    userId: string;
+    userName?: string;
+};
+
 const dedupeMessagesById = (items: ChatMessage[]): ChatMessage[] => {
     const uniqueById = new Map<string, ChatMessage>();
 
@@ -68,7 +113,7 @@ const dedupeMessagesById = (items: ChatMessage[]): ChatMessage[] => {
 
 export default function ChatRoomScreen() {
     const router = useRouter();
-    const { roomId, name } = useLocalSearchParams<{ roomId: string; name?: string }>();
+    const { roomId, name, systemNotice } = useLocalSearchParams<{ roomId: string; name?: string; systemNotice?: string }>();
     const { user } = useAuth();
 
     const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -98,8 +143,32 @@ export default function ChatRoomScreen() {
     const shouldAutoScrollRef = useRef<boolean>(true);
     const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const isTypingRef = useRef<boolean>(false);
+    const systemNoticeConsumedRef = useRef<boolean>(false);
 
     const meId = user?._id ?? null;
+
+    useEffect(() => {
+        if (!roomId) return;
+        if (!systemNotice || typeof systemNotice !== "string") return;
+        if (systemNoticeConsumedRef.current) return;
+
+        systemNoticeConsumedRef.current = true;
+        shouldAutoScrollRef.current = true;
+
+        const systemMsg: ChatMessage = {
+            id: `notice-${Date.now()}`,
+            content: systemNotice,
+            isMine: false,
+            senderId: "system",
+            createdAt: new Date().toLocaleTimeString("vi-VN", {
+                hour: "2-digit",
+                minute: "2-digit",
+            }),
+            kind: "system",
+        };
+
+        setMessages((prev) => [...prev, systemMsg]);
+    }, [roomId, systemNotice]);
 
     const title = useMemo(() => {
         if (!room) {
@@ -212,7 +281,10 @@ export default function ChatRoomScreen() {
                         return base;
                     });
 
-                setMessages(dedupeMessagesById(mapped));
+                setMessages((prev) => {
+                    const systemMessages = prev.filter((m) => m.kind === "system");
+                    return dedupeMessagesById([...mapped, ...systemMessages]);
+                });
             } catch {
                 // có thể hiển thị toast / alert sau
             } finally {
@@ -519,6 +591,18 @@ export default function ChatRoomScreen() {
                 };
 
                 setMessages((prev) => [...prev, systemMsg]);
+
+                // Update room.users nickname in realtime
+                setRoom((prev) => {
+                    if (!prev || !Array.isArray(prev.users)) return prev;
+
+                    const nextUsers = prev.users.map((u) => {
+                        if (String(u.user_id) !== String(targetId)) return u;
+                        return { ...u, nickname: newNickname };
+                    });
+
+                    return { ...prev, users: nextUsers };
+                });
             } catch (e) {
                 console.log("[CHAT] SERVER_NICKNAME_CHANGED handle error", e);
             }
@@ -576,12 +660,336 @@ export default function ChatRoomScreen() {
             }
         };
 
+        const handleMembersAdded = (payload: MembersAddedEvent) => {
+            try {
+                if (!payload || String(payload.roomId) !== roomKey) return;
+
+                const meIdStr = meId ? String(meId) : null;
+                const isMeAdder = !!meIdStr && payload.adderId && String(payload.adderId) === meIdStr;
+
+                const names = Array.isArray(payload.members)
+                    ? payload.members
+                        .map((m) => m?.nickname)
+                        .filter(Boolean)
+                    : [];
+
+                const suffix = names.length ? names.join(", ") : "thành viên mới";
+                const adderName = payload.adderName || "Một thành viên";
+
+                const content = isMeAdder
+                    ? `Bạn đã thêm ${suffix} vào nhóm`
+                    : `${adderName} đã thêm ${suffix} vào nhóm`;
+
+                const systemMsg: ChatMessage = {
+                    id: `members-added-${Date.now()}`,
+                    content,
+                    isMine: false,
+                    senderId: "system",
+                    createdAt: new Date().toLocaleTimeString("vi-VN", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                    }),
+                    kind: "system",
+                };
+
+                setMessages((prev) => [...prev, systemMsg]);
+
+                // Update room.users so new members show correct avatar/nickname realtime
+                if (Array.isArray(payload.members) && payload.members.length) {
+                    setRoom((prev) => {
+                        if (!prev) return prev;
+                        const prevUsers = Array.isArray(prev.users) ? prev.users : [];
+
+                        const byId = new Map(prevUsers.map((u) => [String(u.user_id), u]));
+
+                        for (const m of payload.members || []) {
+                            const id = String(m.userId);
+                            if (!id) continue;
+                            const existing = byId.get(id);
+                            if (existing) {
+                                byId.set(id, {
+                                    ...existing,
+                                    nickname: m.nickname ?? existing.nickname,
+                                    avatar: m.avatar ?? existing.avatar,
+                                    role: (m.role as any) ?? existing.role,
+                                    deletedAt: undefined,
+                                });
+                            } else {
+                                byId.set(id, {
+                                    user_id: id,
+                                    nickname: m.nickname || "",
+                                    avatar: m.avatar,
+                                    role: (m.role as any) || "member",
+                                } as any);
+                            }
+                        }
+
+                        return { ...prev, users: Array.from(byId.values()) };
+                    });
+                }
+            } catch (e) {
+                console.log("[CHAT] SERVER_MEMBERS_ADDED handle error", e);
+            }
+        };
+
+        const roleLabel = (role?: string) => {
+            if (role === "owner") return "Chủ nhóm";
+            if (role === "co_owner") return "Phó nhóm";
+            return "Thành viên";
+        };
+
+        const handleMemberRemoved = (payload: MemberRemovedEvent) => {
+            try {
+                if (!payload || String(payload.roomId) !== roomKey) return;
+
+                const meIdStr = meId ? String(meId) : null;
+                const changerIdStr = payload.changerId ? String(payload.changerId) : null;
+                const targetIdStr = String(payload.targetId);
+
+                const isMeChanger = !!meIdStr && !!changerIdStr && meIdStr === changerIdStr;
+                const isMeTarget = !!meIdStr && meIdStr === targetIdStr;
+
+                const changerName = payload.changerName || "Một thành viên";
+                const targetName =
+                    payload.targetName ||
+                    room?.users?.find((u) => String(u.user_id) === targetIdStr)?.nickname ||
+                    "một thành viên";
+
+                let content: string;
+                if (isMeTarget) {
+                    content = isMeChanger
+                        ? "Bạn đã rời khỏi nhóm"
+                        : `${changerName} đã xoá bạn khỏi nhóm`;
+                } else {
+                    content = isMeChanger
+                        ? `Bạn đã xoá ${targetName} khỏi nhóm`
+                        : `${changerName} đã xoá ${targetName} khỏi nhóm`;
+                }
+
+                const systemMsg: ChatMessage = {
+                    id: `member-removed-${Date.now()}`,
+                    content,
+                    isMine: false,
+                    senderId: "system",
+                    createdAt: new Date().toLocaleTimeString("vi-VN", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                    }),
+                    kind: "system",
+                };
+
+                setMessages((prev) => [...prev, systemMsg]);
+
+                // Update room state (remove member)
+                setRoom((prev) => {
+                    if (!prev || !Array.isArray(prev.users)) return prev;
+                    return {
+                        ...prev,
+                        users: prev.users.filter((u) => String(u.user_id) !== targetIdStr),
+                    };
+                });
+            } catch (e) {
+                console.log("[CHAT] SERVER_MEMBER_REMOVED handle error", e);
+            }
+        };
+
+        const handleMemberRoleChanged = (payload: MemberRoleChangedEvent) => {
+            try {
+                if (!payload || String(payload.roomId) !== roomKey) return;
+
+                const meIdStr = meId ? String(meId) : null;
+                const changerIdStr = payload.changerId ? String(payload.changerId) : null;
+                const isMeChanger = !!meIdStr && !!changerIdStr && meIdStr === changerIdStr;
+
+                const changes = Array.isArray(payload.changes) && payload.changes.length
+                    ? payload.changes
+                    : payload.targetId && payload.newRole
+                        ? [{ userId: String(payload.targetId), newRole: String(payload.newRole) }]
+                        : [];
+
+                if (!changes.length) return;
+
+                // Update room users roles
+                setRoom((prev) => {
+                    if (!prev || !Array.isArray(prev.users)) return prev;
+
+                    const nextUsers = prev.users.map((u) => {
+                        const found = changes.find((c) => String(c.userId) === String(u.user_id));
+                        if (!found) return u;
+                        return { ...u, role: found.newRole };
+                    });
+
+                    return { ...prev, users: nextUsers };
+                });
+
+                // Compose system notice (focus on the primary/target change)
+                const primary = changes[0];
+                const targetIdStr = String(primary.userId);
+                const targetName =
+                    payload.targetName ||
+                    room?.users?.find((u) => String(u.user_id) === targetIdStr)?.nickname ||
+                    "một thành viên";
+                const changerName = payload.changerName || "Một thành viên";
+
+                const isMeTarget = !!meIdStr && meIdStr === targetIdStr;
+                const label = roleLabel(primary.newRole);
+
+                let content: string;
+                if (isMeTarget && isMeChanger) {
+                    content = `Bạn đã trở thành ${label}`;
+                } else if (isMeChanger) {
+                    content = `Bạn đã đổi quyền của ${targetName} thành ${label}`;
+                } else if (isMeTarget) {
+                    content = `${changerName} đã đổi quyền của bạn thành ${label}`;
+                } else {
+                    content = `${changerName} đã đổi quyền của ${targetName} thành ${label}`;
+                }
+
+                const systemMsg: ChatMessage = {
+                    id: `role-changed-${Date.now()}`,
+                    content,
+                    isMine: false,
+                    senderId: "system",
+                    createdAt: new Date().toLocaleTimeString("vi-VN", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                    }),
+                    kind: "system",
+                };
+
+                setMessages((prev) => [...prev, systemMsg]);
+            } catch (e) {
+                console.log("[CHAT] SERVER_MEMBER_ROLE_CHANGED handle error", e);
+            }
+        };
+
+        const handleRoomTitleChanged = (payload: RoomTitleChangedEvent) => {
+            try {
+                if (!payload || String(payload.roomId) !== roomKey) return;
+
+                const meIdStr = meId ? String(meId) : null;
+                const changerIdStr = payload.changerId ? String(payload.changerId) : null;
+                const isMeChanger = !!meIdStr && !!changerIdStr && meIdStr === changerIdStr;
+
+                setRoom((prev) => {
+                    if (!prev) return prev;
+                    return { ...prev, title: payload.newTitle as any };
+                });
+
+                const changerName = payload.changerName || "Một thành viên";
+                const content = isMeChanger
+                    ? `Bạn đã đổi tên nhóm thành "${payload.newTitle}"`
+                    : `${changerName} đã đổi tên nhóm thành "${payload.newTitle}"`;
+
+                const systemMsg: ChatMessage = {
+                    id: `title-changed-${Date.now()}`,
+                    content,
+                    isMine: false,
+                    senderId: "system",
+                    createdAt: new Date().toLocaleTimeString("vi-VN", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                    }),
+                    kind: "system",
+                };
+
+                setMessages((prev) => [...prev, systemMsg]);
+            } catch (e) {
+                console.log("[CHAT] SERVER_ROOM_TITLE_CHANGED handle error", e);
+            }
+        };
+
+        const handleRoomAvatarChanged = (payload: RoomAvatarChangedEvent) => {
+            try {
+                if (!payload || String(payload.roomId) !== roomKey) return;
+
+                const meIdStr = meId ? String(meId) : null;
+                const changerIdStr = payload.changerId ? String(payload.changerId) : null;
+                const isMeChanger = !!meIdStr && !!changerIdStr && meIdStr === changerIdStr;
+
+                setRoom((prev) => {
+                    if (!prev) return prev;
+                    return { ...prev, avatar: payload.newAvatar as any };
+                });
+
+                const changerName = payload.changerName || "Một thành viên";
+                const content = isMeChanger
+                    ? "Bạn đã thay đổi ảnh đại diện nhóm"
+                    : `${changerName} đã thay đổi ảnh đại diện nhóm`;
+
+                const systemMsg: ChatMessage = {
+                    id: `avatar-changed-${Date.now()}`,
+                    content,
+                    isMine: false,
+                    senderId: "system",
+                    createdAt: new Date().toLocaleTimeString("vi-VN", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                    }),
+                    kind: "system",
+                };
+
+                setMessages((prev) => [...prev, systemMsg]);
+            } catch (e) {
+                console.log("[CHAT] SERVER_ROOM_AVATAR_CHANGED handle error", e);
+            }
+        };
+
+        const handleMemberLeft = (payload: MemberLeftEvent) => {
+            try {
+                if (!payload || String(payload.roomId) !== roomKey) return;
+
+                const meIdStr = meId ? String(meId) : null;
+                const leaverId = String(payload.userId);
+                const isMeLeaver = !!meIdStr && meIdStr === leaverId;
+
+                const name =
+                    payload.userName ||
+                    room?.users?.find((u) => String(u.user_id) === leaverId)?.nickname ||
+                    "Một thành viên";
+
+                const content = isMeLeaver
+                    ? "Bạn đã rời khỏi nhóm"
+                    : `${name} đã rời khỏi nhóm`;
+
+                const systemMsg: ChatMessage = {
+                    id: `member-left-${Date.now()}`,
+                    content,
+                    isMine: false,
+                    senderId: "system",
+                    createdAt: new Date().toLocaleTimeString("vi-VN", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                    }),
+                    kind: "system",
+                };
+
+                setMessages((prev) => [...prev, systemMsg]);
+
+                setRoom((prev) => {
+                    if (!prev || !Array.isArray(prev.users)) return prev;
+                    return {
+                        ...prev,
+                        users: prev.users.filter((u) => String(u.user_id) !== leaverId),
+                    };
+                });
+            } catch (e) {
+                console.log("[CHAT] SERVER_MEMBER_LEFT handle error", e);
+            }
+        };
+
         // Tham gia room và lắng nghe sự kiện, gửi kèm userId để backend kiểm tra
         console.log("[CHAT] JOIN_ROOM emit", { roomId: roomKey, userId: meId });
         socket.emit("JOIN_ROOM", { roomId: roomKey, userId: meId });
         console.log("[CHAT] Register SERVER_SEND_MESSAGE listener");
         socket.on("SERVER_SEND_MESSAGE", handleIncoming);
         socket.on("SERVER_NICKNAME_CHANGED", handleNicknameChanged);
+        socket.on("SERVER_MEMBERS_ADDED", handleMembersAdded);
+        socket.on("SERVER_MEMBER_REMOVED", handleMemberRemoved);
+        socket.on("SERVER_MEMBER_ROLE_CHANGED", handleMemberRoleChanged);
+        socket.on("SERVER_ROOM_TITLE_CHANGED", handleRoomTitleChanged);
+        socket.on("SERVER_ROOM_AVATAR_CHANGED", handleRoomAvatarChanged);
+        socket.on("SERVER_MEMBER_LEFT", handleMemberLeft);
         socket.on("SERVER_TYPING", handleTyping);
         socket.on("SERVER_STOP_TYPING", handleStopTyping);
         socket.on("SERVER_MESSAGE_DELETED", handleMessageDeleted);
@@ -593,6 +1001,12 @@ export default function ChatRoomScreen() {
             });
             socket.off("SERVER_SEND_MESSAGE", handleIncoming);
             socket.off("SERVER_NICKNAME_CHANGED", handleNicknameChanged);
+            socket.off("SERVER_MEMBERS_ADDED", handleMembersAdded);
+            socket.off("SERVER_MEMBER_REMOVED", handleMemberRemoved);
+            socket.off("SERVER_MEMBER_ROLE_CHANGED", handleMemberRoleChanged);
+            socket.off("SERVER_ROOM_TITLE_CHANGED", handleRoomTitleChanged);
+            socket.off("SERVER_ROOM_AVATAR_CHANGED", handleRoomAvatarChanged);
+            socket.off("SERVER_MEMBER_LEFT", handleMemberLeft);
             socket.off("SERVER_TYPING", handleTyping);
             socket.off("SERVER_STOP_TYPING", handleStopTyping);
             socket.off("SERVER_MESSAGE_DELETED", handleMessageDeleted);

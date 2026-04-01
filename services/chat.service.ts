@@ -85,10 +85,36 @@ export const chatService = {
     },
 
     updateRoomAvatar(roomId: string, avatar: string) {
-        return apiAuthRequest<ApiEnvelope<{ room: RoomChatDto }>>(`/chat/room/${roomId}/avatar`, {
-            method: "PATCH",
-            body: { avatar },
-        });
+        const trimmed = typeof avatar === "string" ? avatar.trim() : "";
+        const isRemoteUrl = /^https?:\/\//i.test(trimmed);
+
+        if (isRemoteUrl) {
+            return apiAuthRequest<ApiEnvelope<{ room: RoomChatDto }>>(`/chat/room/${roomId}/avatar`, {
+                method: "PATCH",
+                body: { avatar: trimmed },
+            });
+        }
+
+        const formData = new FormData();
+        formData.append(
+            "avatar",
+            {
+                uri: trimmed,
+                name: "group-avatar.jpg",
+                type: "image/jpeg",
+            } as any,
+        );
+
+        return apiAuthRequest<ApiEnvelope<{ room: RoomChatDto; avatarUrl?: string }>>(
+            `/chat/room/${roomId}/avatar`,
+            {
+                method: "PATCH",
+                body: formData,
+                headers: {
+                    "Content-Type": "multipart/form-data",
+                },
+            },
+        );
     },
     getRooms() {
         return apiAuthRequest<GetRoomsResponse>("/chat/rooms", {
@@ -196,6 +222,25 @@ export const chatService = {
 
     deleteRoom(roomId: string) {
         return apiAuthRequest<ApiEnvelope<unknown>>(`/chat/rooms/${roomId}/delete`, {
+            method: "DELETE",
+        });
+    },
+
+    addMembersToGroup(roomId: string, usersId: string[]) {
+        return apiAuthRequest<
+            ApiEnvelope<{
+                room: RoomChatDto;
+                addedIds: string[];
+                restoredIds: string[];
+            }>
+        >(`/chat/groups/${roomId}/member`, {
+            method: "POST",
+            body: { usersId },
+        });
+    },
+
+    leaveGroup(roomId: string) {
+        return apiAuthRequest<ApiEnvelope<{ roomId: string }>>(`/chat/groups/${roomId}/leave`, {
             method: "DELETE",
         });
     },

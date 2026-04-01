@@ -203,6 +203,9 @@ export default function GroupMembersScreen() {
         );
     };
 
+    const myMember = members.find(m => m.user_id === user?._id);
+    const canAddMember = myMember?.role === "owner" || myMember?.role === "co_owner";
+
     return (
         <SafeAreaView style={styles.container}>
             <View style={styles.header}>
@@ -210,6 +213,21 @@ export default function GroupMembersScreen() {
                     <Ionicons name="chevron-back" size={24} color="#111" />
                 </Pressable>
                 <Text style={styles.headerTitle}>Thành viên nhóm</Text>
+
+                {canAddMember ? (
+                    <Pressable
+                        style={styles.headerAction}
+                        onPress={() => {
+                            if (!roomId) return;
+                            router.push({
+                                pathname: "/(chats)/add-members",
+                                params: { roomId: String(roomId) },
+                            });
+                        }}
+                    >
+                        <Ionicons name="person-add-outline" size={22} color="#111" />
+                    </Pressable>
+                ) : null}
             </View>
             {loading ? (
                 <ActivityIndicator style={{ marginTop: 32 }} size="large" color="#0a84ff" />
@@ -237,6 +255,7 @@ const styles = StyleSheet.create({
     },
     backButton: { paddingRight: 8, paddingVertical: 4, marginRight: 4 },
     headerTitle: { flex: 1, fontSize: 17, fontWeight: "600", color: "#111" },
+    headerAction: { paddingLeft: 8, paddingVertical: 6 },
     memberRow: {
         flexDirection: "row",
         alignItems: "center",
