@@ -53,10 +53,9 @@ export default function Home() {
 
     let followSet: Set<string> = new Set();
     const res = await request(async () => {
-      const [postsRes, usersRes, followersRes, followingRes] = await Promise.all([
+      const [postsRes, usersRes, followingRes] = await Promise.all([
         postService.getPostsNotMe(),
         userService.getUsers(),
-        followService.getFollowers(user._id),
         followService.getFollowing(user._id),
       ]);
 
@@ -99,9 +98,8 @@ export default function Home() {
       }
 
       // Lấy danh sách userId của followers và following
-      const followerIds = (followersRes.data ?? []).map((u) => u._id);
       const followingIds = (followingRes.data ?? []).map((u) => u._id);
-      followSet = new Set([...followerIds, ...followingIds]);
+      followSet = new Set(followingIds);
 
       return {
         posts,
