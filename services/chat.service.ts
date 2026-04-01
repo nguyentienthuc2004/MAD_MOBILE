@@ -199,5 +199,18 @@ export const chatService = {
             method: "DELETE",
         });
     },
+
+    addMembersToGroup(roomId: string, usersId: string[]) {
+        return apiAuthRequest<
+            ApiEnvelope<{
+                room: RoomChatDto;
+                addedIds: string[];
+                restoredIds: string[];
+            }>
+        >(`/chat/groups/${roomId}/member`, {
+            method: "POST",
+            body: { usersId },
+        });
+    },
 };
 
