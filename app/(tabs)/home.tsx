@@ -7,7 +7,7 @@ import { type Post as ApiPost, postService } from "@/services/post.service";
 import { recommenderService } from "@/services/recommender.service";
 import { type AppUser, userService } from "@/services/user.service";
 import { useRouter } from "expo-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import HomeHeader from "../../components/HomeHeader";
@@ -38,8 +38,11 @@ export default function Home() {
   const [refreshing, setRefreshing] = useState(false);
   const [sensitiveResetKey, setSensitiveResetKey] = useState(0);
   const [viewedAllPosts, setViewedAllPosts] = useState(false);
-  const [followingByUserId, setFollowingByUserId] = useState<Record<string, boolean>>({});
+  const [followingByUserId, setFollowingByUserId] = useState<
+    Record<string, boolean>
+  >({});
   const [followIds, setFollowIds] = useState<Set<string>>(new Set());
+  const viewedPostIdsRef = useRef<Set<string>>(new Set());
 
   const fetchFeed = useCallback(async () => {
     if (!isAuthenticated || !user?._id) {
@@ -53,12 +56,13 @@ export default function Home() {
 
     let followSet: Set<string> = new Set();
     const res = await request(async () => {
-      const [postsRes, usersRes, followersRes, followingRes] = await Promise.all([
-        postService.getPostsNotMe(),
-        userService.getUsers(),
-        followService.getFollowers(user._id),
-        followService.getFollowing(user._id),
-      ]);
+      const [postsRes, usersRes, followersRes, followingRes] =
+        await Promise.all([
+          postService.getPostsNotMe(),
+          userService.getUsers(),
+          followService.getFollowers(user._id),
+          followService.getFollowing(user._id),
+        ]);
 
       const posts = postsRes.data ?? [];
       const musicIds = Array.from(
@@ -162,9 +166,7 @@ export default function Home() {
 
   const onlineUsers = useMemo<UserAvatar[]>(() => {
     return users
-      .filter((item) =>
-        item._id !== user?._id && followIds.has(item._id)
-      )
+      .filter((item) => item._id !== user?._id && followIds.has(item._id))
       .map((item) => ({
         id: item._id,
         name: item.displayName || item.username || "Người dùng",
@@ -278,7 +280,10 @@ export default function Home() {
           return reverted;
         });
 
-        Alert.alert("Lỗi", err?.message || "Không thể thay đổi trạng thái theo dõi");
+        Alert.alert(
+          "Lỗi",
+          err?.message || "Không thể thay đổi trạng thái theo dõi",
+        );
       }
     })();
   };
@@ -305,6 +310,23 @@ export default function Home() {
     });
   };
 
+  const handlePostVisible = useCallback(
+    async (post: Post) => {
+      if (!user?._id || !post.id || viewedPostIdsRef.current.has(post.id)) {
+        return;
+      }
+
+      viewedPostIdsRef.current.add(post.id);
+
+      try {
+        await postService.viewPost(post.id);
+      } catch {
+        viewedPostIdsRef.current.delete(post.id);
+      }
+    },
+    [user?._id],
+  );
+
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
       <HomeHeader />
@@ -322,6 +344,7 @@ export default function Home() {
           sensitiveResetKey={sensitiveResetKey}
           refreshing={refreshing}
           onRefresh={handleRefresh}
+          onPostVisible={handlePostVisible}
           canFollow={Boolean(isAuthenticated && user?._id)}
           getIsFollowing={getIsFollowing}
           onToggleFollow={handleToggleFollow}
