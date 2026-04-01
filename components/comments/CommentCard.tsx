@@ -259,7 +259,7 @@ const styles = StyleSheet.create({
   username: { fontWeight: "700", color: "#111", flexShrink: 1 },
   usernameReply: { fontWeight: "700", color: "#111", fontSize: 13 },
   time: { color: "#666", fontSize: 12, marginLeft: 8 },
-  timeReply: { color: "#666", fontSize: 12 },
+  timeReply: { color: "#666", fontSize: 12, marginLeft: 8 },
   content: { marginTop: 6, color: "#111" },
   contentHighlighted: { fontWeight: "600" },
   usernameHighlighted: { fontWeight: "800" },
