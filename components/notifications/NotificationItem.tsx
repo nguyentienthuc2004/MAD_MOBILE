@@ -1,5 +1,5 @@
 import { useNotifications } from "@/stores/notification.store";
-import React from "react";
+import React, { useState } from "react";
 import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 type Props = {
@@ -9,11 +9,24 @@ type Props = {
 
 const NotificationItem: React.FC<Props> = ({ notification, onPress }) => {
   const markRead = useNotifications((s) => s.markRead);
+  const markUnread = useNotifications((s) => (s as any).markUnread);
+  const [menuVisible, setMenuVisible] = useState(false);
 
   const handlePress = () => {
     onPress && onPress(notification);
     if (!notification.isRead) {
       void markRead(String(notification._id));
+    }
+  };
+
+  const handleMarkUnread = async () => {
+    setMenuVisible(false);
+    if (notification.isRead) {
+      try {
+        await markUnread(String(notification._id));
+      } catch (e) {
+        console.error("mark unread failed", e);
+      }
     }
   };
 
@@ -64,6 +77,7 @@ const NotificationItem: React.FC<Props> = ({ notification, onPress }) => {
         style={[
           styles.container,
           notification.isRead ? styles.read : styles.unread,
+          menuVisible ? styles.containerActive : null,
         ]}
       >
         <Image
@@ -78,6 +92,21 @@ const NotificationItem: React.FC<Props> = ({ notification, onPress }) => {
             {new Date(notification.updatedAt).toLocaleString()}
           </Text>
         </View>
+        <View style={styles.actions}>
+          <TouchableOpacity onPress={() => setMenuVisible((v) => !v)}>
+            <Text style={styles.menuTrigger}>⋯</Text>
+          </TouchableOpacity>
+          {menuVisible && notification.isRead ? (
+            <View style={styles.menu}>
+              <TouchableOpacity
+                onPress={handleMarkUnread}
+                style={styles.menuItem}
+              >
+                <Text style={styles.menuText}>Đánh dấu là chưa đọc</Text>
+              </TouchableOpacity>
+            </View>
+          ) : null}
+        </View>
       </View>
     </TouchableOpacity>
   );
@@ -90,6 +119,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: "#eee",
+    overflow: "visible",
   },
   unread: {
     backgroundColor: "#e6f7ff",
@@ -115,6 +145,45 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#666",
     marginTop: 6,
+  },
+  actions: {
+    marginLeft: 8,
+    alignItems: "flex-end",
+    overflow: "visible",
+  },
+  menuTrigger: {
+    fontSize: 20,
+    color: "#666",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  menu: {
+    position: "absolute",
+    right: 36,
+    top: -4,
+    backgroundColor: "#fff",
+    borderRadius: 6,
+    elevation: 3,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    minWidth: 160,
+    zIndex: 999,
+    overflow: "visible",
+  },
+  containerActive: {
+    zIndex: 1000,
+    elevation: 10,
+  },
+  menuItem: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  menuText: {
+    color: "#111",
+    flexShrink: 1,
+    flexWrap: "wrap",
   },
 });
 

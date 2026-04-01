@@ -30,7 +30,8 @@ export default function ChangePasswordScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const isNewPasswordValid = newPassword.length >= 6;
-  const isConfirmMatch = confirmPassword.length > 0 && confirmPassword === newPassword;
+  const isConfirmMatch =
+    confirmPassword.length > 0 && confirmPassword === newPassword;
   const canSubmit =
     currentPassword.length > 0 && isNewPasswordValid && isConfirmMatch;
 
@@ -57,7 +58,7 @@ export default function ChangePasswordScreen() {
     } catch (err: any) {
       showAlert(
         "Lỗi",
-        err?.message || "Không thể thay đổi mật khẩu. Vui lòng thử lại."
+        err?.message || "Không thể thay đổi mật khẩu. Vui lòng thử lại.",
       );
     } finally {
       setIsSubmitting(false);
@@ -185,9 +186,9 @@ export default function ChangePasswordScreen() {
         </Pressable>
 
         {/* Forgot password link */}
-        <Pressable style={styles.forgotBtn} onPress={handleForgotPassword}>
+        {/* <Pressable style={styles.forgotBtn} onPress={handleForgotPassword}>
           <Text style={styles.forgotBtnText}>Quên mật khẩu?</Text>
-        </Pressable>
+        </Pressable> */}
       </ScrollView>
     </SafeAreaView>
   );

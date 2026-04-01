@@ -1,6 +1,6 @@
 import { useNotifications } from "@/stores/notification.store";
 import { useRouter } from "expo-router";
-import React, { useEffect } from "react";
+import React from "react";
 import { FlatList, RefreshControl, StyleSheet, Text, View } from "react-native";
 import NotificationItem from "./NotificationItem";
 
@@ -9,10 +9,6 @@ const NotificationsList: React.FC = () => {
   const refresh = useNotifications((s) => s.refresh);
   const loading = useNotifications((s) => s.loading);
   const router = useRouter();
-
-  useEffect(() => {
-    void refresh();
-  }, []);
 
   if (!notifications || !notifications.length) {
     return (

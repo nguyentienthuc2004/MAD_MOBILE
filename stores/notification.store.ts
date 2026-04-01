@@ -1,12 +1,13 @@
 import {
-    fetchNotifications,
-    markAllRead,
-    markNotificationRead,
+  fetchNotifications,
+  markAllRead,
+  markNotificationRead,
+  markNotificationUnread,
 } from "@/services/notification.service";
 import {
-    joinUserRoom,
-    startNotificationListeners,
-    stopNotificationListeners,
+  joinUserRoom,
+  startNotificationListeners,
+  stopNotificationListeners,
 } from "@/socket/notification.client";
 import { useAuth } from "@/stores/auth.store";
 import { create } from "zustand";
@@ -77,9 +78,12 @@ export const useNotifications = create<NotificationState>((set, get) => ({
     stopNotificationListeners();
   },
   refresh: async () => {
+    if (get().loading) {
+      return;
+    }
     set({ loading: true });
     try {
-      const res = await fetchNotifications({ page: 1, limit: 50 });
+      const res = await fetchNotifications();
       let notifications = res.data.notifications || [];
 
       notifications = notifications.sort(
@@ -114,6 +118,24 @@ export const useNotifications = create<NotificationState>((set, get) => ({
       set({ notifications: prev, unreadCount: prevCount });
     }
   },
+  markUnread: async (id: string) => {
+    const prev = get().notifications.slice();
+    const prevCount = get().unreadCount;
+
+    set((state) => ({
+      notifications: state.notifications.map((n) =>
+        String(n._id) === String(id) ? { ...n, isRead: false } : n,
+      ),
+      unreadCount: state.unreadCount + 1,
+    }));
+
+    try {
+      await markNotificationUnread(id);
+    } catch (e) {
+      console.error("mark unread error", e);
+      set({ notifications: prev, unreadCount: prevCount });
+    }
+  },
   markAllRead: async () => {
     const prev = get().notifications.slice();
     const prevCount = get().unreadCount;
@@ -131,9 +153,26 @@ export const useNotifications = create<NotificationState>((set, get) => ({
   },
 }));
 
+type NotificationAuthWatcherState = {
+  unsubscribe: (() => void) | null;
+};
+
+const notificationAuthWatcher =
+  (globalThis as any).__notificationAuthWatcher as
+    | NotificationAuthWatcherState
+    | undefined;
+
+const watcherState: NotificationAuthWatcherState = notificationAuthWatcher ?? {
+  unsubscribe: null,
+};
+
+(globalThis as any).__notificationAuthWatcher = watcherState;
+
 {
+  watcherState.unsubscribe?.();
+
   let prevUser = useAuth.getState().user;
-  useAuth.subscribe((state) => {
+  watcherState.unsubscribe = useAuth.subscribe((state) => {
     const user = state.user;
     const svc = useNotifications.getState();
     if (user && !prevUser) {
