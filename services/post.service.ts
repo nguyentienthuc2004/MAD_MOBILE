@@ -13,6 +13,10 @@ export interface Post {
   updatedAt: string;
   isSensitive: boolean;
 }
+
+export interface FeedPostsResponse extends ApiResponse<Post[]> {
+  viewedAllPosts?: boolean;
+}
 export interface PostRequest {
   caption: string;
   hashtags: string[];
@@ -140,12 +144,12 @@ const editPost = (postId:string, data: EditPostRequest): Promise<ApiResponse<Pos
     },
     body: buildEditPostFormData(data),
   });
-const getPostsNotByMe = (): Promise<ApiResponse<Post[]>> =>
-  apiAuthRequest<ApiResponse<Post[]>>(`/posts/getPostsNotByMe`, {
+const getPostsNotByMe = (): Promise<FeedPostsResponse> =>
+  apiAuthRequest<FeedPostsResponse>(`/posts/getPostsNotByMe`, {
     method: "GET",
   });
 
-const getPostsNotMe = (): Promise<ApiResponse<Post[]>> => getPostsNotByMe();
+const getPostsNotMe = (): Promise<FeedPostsResponse> => getPostsNotByMe();
   
 export const postService = {
   getPostsByUserId,

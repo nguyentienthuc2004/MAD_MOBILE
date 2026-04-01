@@ -4,6 +4,7 @@ import { chatService } from "@/services/chat.service";
 import { followService } from "@/services/follow.service";
 import { musicService } from "@/services/music.service";
 import { type Post as ApiPost, postService } from "@/services/post.service";
+import { recommenderService } from "@/services/recommender.service";
 import { type AppUser, userService } from "@/services/user.service";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -24,6 +25,7 @@ export default function Home() {
   const isAuthenticated = useAuth((state) => state.isAuthenticated);
   const { request, loading, error } = useApi<{
     posts: ApiPost[];
+    viewedAllPosts: boolean;
     users: AppUser[];
     musicUrlsById: Record<string, string>;
   }>();
@@ -35,6 +37,7 @@ export default function Home() {
   );
   const [refreshing, setRefreshing] = useState(false);
   const [sensitiveResetKey, setSensitiveResetKey] = useState(0);
+  const [viewedAllPosts, setViewedAllPosts] = useState(false);
   const [followingByUserId, setFollowingByUserId] = useState<Record<string, boolean>>({});
   const [followIds, setFollowIds] = useState<Set<string>>(new Set());
 
@@ -44,6 +47,7 @@ export default function Home() {
       setUsers([]);
       setMusicUrlsById({});
       setFollowIds(new Set());
+      setViewedAllPosts(false);
       return;
     }
 
@@ -101,6 +105,7 @@ export default function Home() {
 
       return {
         posts,
+        viewedAllPosts: Boolean(postsRes.viewedAllPosts),
         users: usersRes.data ?? [],
         musicUrlsById: resolvedMusicUrlsById,
       };
@@ -111,6 +116,7 @@ export default function Home() {
     }
 
     setApiPosts(res.posts);
+    setViewedAllPosts(res.viewedAllPosts);
     setUsers(res.users);
     setMusicUrlsById(res.musicUrlsById);
     setFollowIds(followSet);
@@ -124,6 +130,7 @@ export default function Home() {
   const handleRefresh = useCallback(async () => {
     try {
       setRefreshing(true);
+      await recommenderService.refreshRecommender();
       await fetchFeed();
     } finally {
       setRefreshing(false);
@@ -306,6 +313,9 @@ export default function Home() {
           <Text style={styles.stateText}>Đang tải bảng tin...</Text>
         ) : null}
         {error ? <Text style={styles.stateText}>{error}</Text> : null}
+        {!loading && !error && viewedAllPosts && feedPosts.length === 0 ? (
+          <Text style={styles.stateText}>Bạn đã xem hết bài viết</Text>
+        ) : null}
 
         <PostsList
           posts={feedPosts}
