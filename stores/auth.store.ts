@@ -31,6 +31,7 @@ type AuthState = {
 
 const ACCESS_TOKEN_KEY = "accessToken";
 const REFRESH_TOKEN_KEY = "refreshToken";
+let isManualLogoutInProgress = false;
 
 const normalizeErrorMessage = (error: unknown, fallback: string) => {
   if (error instanceof ApiError) {
@@ -164,27 +165,43 @@ export const useAuth = create<AuthState>((set, get) => ({
   },
 
   logout: async () => {
-    const { accessToken, refreshToken, isAuthenticated } = get();
-
-    if (isAuthenticated && accessToken) {
-      try {
-        await authService.logout(refreshToken ?? undefined);
-      } catch {}
+    if (isManualLogoutInProgress) {
+      return;
     }
 
-    await clearLocalSession();
+    isManualLogoutInProgress = true;
+    const { accessToken, refreshToken, isAuthenticated } = get();
+
+    try {
+      if (isAuthenticated && accessToken) {
+        try {
+          await authService.logout(refreshToken ?? undefined);
+        } catch {}
+      }
+    } finally {
+      await clearLocalSession();
+      isManualLogoutInProgress = false;
+    }
   },
 
   logoutAll: async () => {
-    const { accessToken, isAuthenticated } = get();
-
-    if (isAuthenticated && accessToken) {
-      try {
-        await authService.logoutAll();
-      } catch {}
+    if (isManualLogoutInProgress) {
+      return;
     }
 
-    await clearLocalSession("Bạn đã đăng xuất ra khỏi tất cả thiết bị.");
+    isManualLogoutInProgress = true;
+    const { accessToken, isAuthenticated } = get();
+
+    try {
+      if (isAuthenticated && accessToken) {
+        try {
+          await authService.logoutAll();
+        } catch {}
+      }
+    } finally {
+      await clearLocalSession("Bạn đã đăng xuất ra khỏi tất cả thiết bị.");
+      isManualLogoutInProgress = false;
+    }
   },
 }));
 
@@ -233,6 +250,16 @@ configureApiAuth({
     }
   },
   onAuthFailure: async () => {
+    const { isAuthenticated, accessToken, refreshToken } = useAuth.getState();
+
+    if (
+      isManualLogoutInProgress ||
+      (!isAuthenticated && !accessToken && !refreshToken)
+    ) {
+      await clearLocalSession();
+      return;
+    }
+
     await clearLocalSession(
       "Bạn đã hết phiên đăng nhập. Vui lòng đăng nhập lại.",
     );

@@ -242,6 +242,7 @@ export default function SinglePostView() {
       caption: post.caption ?? "",
       hashtags: post.hashtags ?? [],
       likes: post.likeCount ?? 0,
+      commentCount: post.commentCount ?? 0,
       createdAt: post.createdAt,
       musicUrl: post.musicId ?? undefined,
       isSensitive: Boolean(post.isSensitive),

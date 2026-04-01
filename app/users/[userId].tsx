@@ -31,7 +31,12 @@ export default function UserProfileScreen() {
   const router = useRouter();
   const { userId } = useLocalSearchParams<{ userId?: string }>();
   const targetUserId = typeof userId === "string" ? userId : "";
-  console.log("[UserProfileScreen] params.userId:", userId, "targetUserId:", targetUserId);
+  console.log(
+    "[UserProfileScreen] params.userId:",
+    userId,
+    "targetUserId:",
+    targetUserId,
+  );
 
   const me = useAuth((state) => state.user);
   const isAuthenticated = useAuth((state) => state.isAuthenticated);
@@ -51,7 +56,6 @@ export default function UserProfileScreen() {
   >({});
 
   const fetchUserProfile = useCallback(async () => {
-
     if (!targetUserId) {
       setProfileUser(null);
       setPosts([]);
@@ -96,7 +100,12 @@ export default function UserProfileScreen() {
     const check = async () => {
       if (!me?._id || !targetUserId || me._id === targetUserId) {
         setIsFollowing(false);
-        console.log("[FollowStatus] Skip check: me?._id:", me?._id, "targetUserId:", targetUserId);
+        console.log(
+          "[FollowStatus] Skip check: me?._id:",
+          me?._id,
+          "targetUserId:",
+          targetUserId,
+        );
         return;
       }
       try {
@@ -136,7 +145,12 @@ export default function UserProfileScreen() {
       createdAt: post.createdAt,
       isSensitive: Boolean(post.isSensitive),
     }));
-  }, [posts, profileUser?.avatarUrl, profileUser?.displayName, profileUser?.username]);
+  }, [
+    posts,
+    profileUser?.avatarUrl,
+    profileUser?.displayName,
+    profileUser?.username,
+  ]);
 
   const displayName =
     profileUser?.displayName || profileUser?.username || "Người dùng";
@@ -194,10 +208,18 @@ export default function UserProfileScreen() {
       try {
         const res = await followService.followUser(targetUserId);
         setIsFollowing(true);
-        if (res && res.following && typeof res.following.followerCount === 'number') {
+        if (
+          res &&
+          res.following &&
+          typeof res.following.followerCount === "number"
+        ) {
           setFollowerCount(res.following.followerCount);
         }
-        if (res && res.following && typeof res.following.followingCount === 'number') {
+        if (
+          res &&
+          res.following &&
+          typeof res.following.followingCount === "number"
+        ) {
           setFollowingCount(res.following.followingCount);
         }
         Alert.alert("Thành công", "Bạn đã theo dõi người này.");
@@ -206,32 +228,36 @@ export default function UserProfileScreen() {
       }
     } else {
       // Đang theo dõi, xác nhận hủy theo dõi
-      Alert.alert(
-        "Xác nhận",
-        "Bạn có chắc muốn hủy theo dõi người này?",
-        [
-          { text: "Hủy", style: "cancel" },
-          {
-            text: "Hủy theo dõi",
-            style: "destructive",
-            onPress: async () => {
-              try {
-                const res = await followService.unfollowUser(targetUserId);
-                setIsFollowing(false);
-                if (res && res.following && typeof res.following.followerCount === 'number') {
-                  setFollowerCount(res.following.followerCount);
-                }
-                if (res && res.following && typeof res.following.followingCount === 'number') {
-                  setFollowingCount(res.following.followingCount);
-                }
-                Alert.alert("Đã hủy theo dõi", "Bạn đã hủy theo dõi người này.");
-              } catch (err: any) {
-                Alert.alert("Lỗi", err?.message || "Không thể hủy theo dõi.");
+      Alert.alert("Xác nhận", "Bạn có chắc muốn hủy theo dõi người này?", [
+        { text: "Hủy", style: "cancel" },
+        {
+          text: "Hủy theo dõi",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              const res = await followService.unfollowUser(targetUserId);
+              setIsFollowing(false);
+              if (
+                res &&
+                res.following &&
+                typeof res.following.followerCount === "number"
+              ) {
+                setFollowerCount(res.following.followerCount);
               }
-            },
+              if (
+                res &&
+                res.following &&
+                typeof res.following.followingCount === "number"
+              ) {
+                setFollowingCount(res.following.followingCount);
+              }
+              Alert.alert("Đã hủy theo dõi", "Bạn đã hủy theo dõi người này.");
+            } catch (err: any) {
+              Alert.alert("Lỗi", err?.message || "Không thể hủy theo dõi.");
+            }
           },
-        ]
-      );
+        },
+      ]);
     }
   };
 
@@ -268,7 +294,10 @@ export default function UserProfileScreen() {
         }
       >
         <View style={styles.headerRow}>
-          <Pressable style={styles.headerIconButton} onPress={() => router.back()}>
+          <Pressable
+            style={styles.headerIconButton}
+            onPress={() => router.back()}
+          >
             <Ionicons name="chevron-back" size={22} color="#111" />
           </Pressable>
 
@@ -288,11 +317,19 @@ export default function UserProfileScreen() {
               <Text style={styles.statLabel}>posts</Text>
             </View>
             <View style={styles.statItem}>
-              <Text style={styles.statValue}>{followerCount !== null ? followerCount : (profileUser?.followerCount ?? 0)}</Text>
+              <Text style={styles.statValue}>
+                {followerCount !== null
+                  ? followerCount
+                  : (profileUser?.followerCount ?? 0)}
+              </Text>
               <Text style={styles.statLabel}>followers</Text>
             </View>
             <View style={styles.statItem}>
-              <Text style={styles.statValue}>{followingCount !== null ? followingCount : (profileUser?.followingCount ?? 0)}</Text>
+              <Text style={styles.statValue}>
+                {followingCount !== null
+                  ? followingCount
+                  : (profileUser?.followingCount ?? 0)}
+              </Text>
               <Text style={styles.statLabel}>following</Text>
             </View>
           </View>
@@ -304,13 +341,19 @@ export default function UserProfileScreen() {
         </View>
 
         <View style={styles.actionsWrap}>
-          <Pressable style={styles.actionProfileButton} onPress={handleToggleFollow}>
+          <Pressable
+            style={styles.actionProfileButton}
+            onPress={handleToggleFollow}
+          >
             <Text style={styles.actionProfileText}>
               {isFollowing ? "Đang theo dõi" : "Theo dõi"}
             </Text>
           </Pressable>
 
-          <Pressable style={styles.actionProfileButton} onPress={handleOpenMessage}>
+          <Pressable
+            style={styles.actionProfileButton}
+            onPress={handleOpenMessage}
+          >
             <Text style={styles.actionProfileText}>Nhắn tin</Text>
           </Pressable>
         </View>
@@ -319,7 +362,9 @@ export default function UserProfileScreen() {
           <Ionicons name="grid-outline" size={20} color="#111" />
         </View>
 
-        {loading && !refreshing ? <Text style={styles.stateText}>Đang tải trang cá nhân...</Text> : null}
+        {loading && !refreshing ? (
+          <Text style={styles.stateText}>Đang tải trang cá nhân...</Text>
+        ) : null}
         {error ? <Text style={styles.stateText}>{error}</Text> : null}
 
         {!loading && !error && feedPosts.length === 0 ? (
