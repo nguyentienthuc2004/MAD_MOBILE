@@ -242,11 +242,7 @@ export default function PostCard({
             onPress: onPressDeletePost,
           },
         ]
-      : [
-          { key: "follow-user", label: "Quan tâm" },
-          { key: "unfollow-user", label: "Không quan tâm" },
-          { key: "block-user", label: "Chặn người dùng", destructive: true },
-        ]);
+      : []);
 
   const handlePressMenuAction = (action: PostCardMenuAction) => {
     setShowMoreMenu(false);
@@ -513,12 +509,14 @@ export default function PostCard({
               </Text>
             </Pressable>
           ) : null}
-          <Pressable
-            onPress={() => setShowMoreMenu(true)}
-            style={styles.moreButton}
-          >
-            <Ionicons name="ellipsis-horizontal" size={18} color="black" />
-          </Pressable>
+          {resolvedMenuActions.length > 0 ? (
+            <Pressable
+              onPress={() => setShowMoreMenu(true)}
+              style={styles.moreButton}
+            >
+              <Ionicons name="ellipsis-horizontal" size={18} color="black" />
+            </Pressable>
+          ) : null}
         </View>
       </View>
 
@@ -629,9 +627,6 @@ export default function PostCard({
             <Ionicons name="paper-plane-outline" size={22} color="black" />
           </Pressable>
         </View>
-        <Pressable>
-          <Ionicons name="bookmark-outline" size={22} color="black" />
-        </Pressable>
       </View>
 
       {/* Likes count is shown inline next to the like button now */}
@@ -663,43 +658,38 @@ export default function PostCard({
         </>
       ) : null}
 
-      <Modal
-        visible={showMoreMenu}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowMoreMenu(false)}
-      >
-        <Pressable
-          style={styles.modalOverlay}
-          onPress={() => setShowMoreMenu(false)}
+      {resolvedMenuActions.length > 0 ? (
+        <Modal
+          visible={showMoreMenu}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setShowMoreMenu(false)}
         >
-          <Pressable style={styles.bottomSheet} onPress={() => {}}>
-            {resolvedMenuActions.map((action) => (
-              <Pressable
-                key={action.key}
-                style={styles.menuItem}
-                onPress={() => handlePressMenuAction(action)}
-              >
-                <Text
-                  style={[
-                    styles.menuText,
-                    action.destructive && styles.dangerText,
-                  ]}
+          <Pressable
+            style={styles.modalOverlay}
+            onPress={() => setShowMoreMenu(false)}
+          >
+            <Pressable style={styles.bottomSheet} onPress={() => {}}>
+              {resolvedMenuActions.map((action) => (
+                <Pressable
+                  key={action.key}
+                  style={styles.menuItem}
+                  onPress={() => handlePressMenuAction(action)}
                 >
-                  {action.label}
-                </Text>
-              </Pressable>
-            ))}
-
-            <Pressable
-              style={styles.cancelButton}
-              onPress={() => setShowMoreMenu(false)}
-            >
-              <Text style={styles.cancelText}>Hủy</Text>
+                  <Text
+                    style={[
+                      styles.menuText,
+                      action.destructive && styles.dangerText,
+                    ]}
+                  >
+                    {action.label}
+                  </Text>
+                </Pressable>
+              ))}
             </Pressable>
           </Pressable>
-        </Pressable>
-      </Modal>
+        </Modal>
+      ) : null}
     </View>
   );
 }
@@ -888,19 +878,5 @@ const styles = StyleSheet.create({
   dangerText: {
     color: "#ed4956",
     fontWeight: "600",
-  },
-  cancelButton: {
-    marginTop: 10,
-    marginHorizontal: 10,
-    minHeight: 50,
-    borderRadius: 12,
-    backgroundColor: "#f5f5f5",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  cancelText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#111",
   },
 });
