@@ -93,7 +93,9 @@ const buildEditPostFormData = (data: EditPostRequest) => {
     formData.append("musicId", data.musicId ?? "null");
   }
 
-  const safeImages = Array.from(new Set((data.existingImages ?? []).filter(Boolean)));
+  const safeImages = Array.from(
+    new Set((data.existingImages ?? []).filter(Boolean)),
+  );
   const existingImages = safeImages.filter(isRemoteImage);
   const newLocalImages = safeImages.filter((uri) => !isRemoteImage(uri));
 
@@ -126,17 +128,22 @@ const createPost = (data: PostRequest): Promise<ApiResponse<Post>> =>
     },
     body: buildCreatePostFormData(data),
   });
-const getPostById = (postId:string) : Promise<ApiResponse<Post>> =>
+const getPostById = (postId: string): Promise<ApiResponse<Post>> =>
   apiAuthRequest<ApiResponse<Post>>(`/posts/${postId}`, {
     method: "GET",
   });
 
-const deletePost = (postId: string): Promise<ApiResponse<{ message?: string }>> =>
+const deletePost = (
+  postId: string,
+): Promise<ApiResponse<{ message?: string }>> =>
   apiAuthRequest<ApiResponse<{ message?: string }>>(`/posts/delete/${postId}`, {
     method: "DELETE",
   });
 
-const editPost = (postId:string, data: EditPostRequest): Promise<ApiResponse<Post>> =>
+const editPost = (
+  postId: string,
+  data: EditPostRequest,
+): Promise<ApiResponse<Post>> =>
   apiAuthRequest<ApiResponse<Post>>(`/posts/edit/${postId}`, {
     method: "PUT",
     headers: {
@@ -150,7 +157,12 @@ const getPostsNotByMe = (): Promise<FeedPostsResponse> =>
   });
 
 const getPostsNotMe = (): Promise<FeedPostsResponse> => getPostsNotByMe();
-  
+
+const viewPost = (postId: string): Promise<ApiResponse<{ message?: string }>> =>
+  apiAuthRequest<ApiResponse<{ message?: string }>>(`/posts/${postId}/view`, {
+    method: "POST",
+  });
+
 export const postService = {
   getPostsByUserId,
   createPost,
@@ -159,4 +171,5 @@ export const postService = {
   editPost,
   getPostsNotByMe,
   getPostsNotMe,
+  viewPost,
 };

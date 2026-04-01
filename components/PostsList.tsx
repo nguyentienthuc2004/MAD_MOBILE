@@ -1,4 +1,4 @@
-import { ReactElement, useRef, useState } from "react";
+import { ReactElement, useEffect, useRef, useState } from "react";
 import {
   FlatList,
   RefreshControl,
@@ -20,6 +20,7 @@ type PostsListProps = {
   onPressPost?: (post: Post) => void;
   onPressMessage?: (post: Post) => void;
   onPressComment?: (post: Post) => void;
+  onPostVisible?: (post: Post) => void | Promise<void>;
 };
 
 export default function PostsList({
@@ -35,11 +36,18 @@ export default function PostsList({
   onPressPost,
   onPressMessage,
   onPressComment: onPressCommentProp,
+  onPostVisible,
 }: PostsListProps) {
   const [activePostId, setActivePostId] = useState<string | null>(
     posts[0]?.id ?? null,
   );
   const [isFeedMuted, setIsFeedMuted] = useState(true);
+  const onPostVisibleRef = useRef(onPostVisible);
+  const lastVisiblePostIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    onPostVisibleRef.current = onPostVisible;
+  }, [onPostVisible]);
 
   const viewabilityConfigRef = useRef({
     itemVisiblePercentThreshold: 70,
@@ -51,6 +59,17 @@ export default function PostsList({
         (item) => item.isViewable,
       )?.item;
       setActivePostId(firstVisiblePost?.id ?? null);
+
+      if (!firstVisiblePost?.id) {
+        return;
+      }
+
+      if (lastVisiblePostIdRef.current === firstVisiblePost.id) {
+        return;
+      }
+
+      lastVisiblePostIdRef.current = firstVisiblePost.id;
+      void onPostVisibleRef.current?.(firstVisiblePost);
     },
   );
 
