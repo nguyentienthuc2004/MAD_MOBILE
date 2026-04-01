@@ -114,7 +114,11 @@ export const authService = {
     );
   },
 
-  resetPassword(payload: { resetToken: string; newPassword: string }) {
+  resetPassword(payload: {
+    resetToken: string;
+    newPassword: string;
+    logoutOtherDevices?: boolean;
+  }) {
     return apiRequest<ApiResponse<{ message?: string }>>(
       "/auth/reset-password",
       {

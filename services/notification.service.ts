@@ -1,17 +1,18 @@
 import { apiAuthRequest, type ApiResponse } from "./api";
 
-export const fetchNotifications = async (
-  opts: { page?: number; limit?: number } = {},
-) => {
-  const { page = 1, limit = 20 } = opts;
+export const fetchNotifications = async () => {
   return apiAuthRequest<ApiResponse<{ notifications: any[]; total: number }>>(
-    `/notifications?page=${page}&limit=${limit}`,
+    `/notifications`,
     { method: "GET" },
   );
 };
 
 export const markNotificationRead = async (id: string) => {
   return apiAuthRequest(`/notifications/${id}/read`, { method: "PUT" });
+};
+
+export const markNotificationUnread = async (id: string) => {
+  return apiAuthRequest(`/notifications/${id}/unread`, { method: "PUT" });
 };
 
 export const markAllRead = async () => {
@@ -21,5 +22,6 @@ export const markAllRead = async () => {
 export default {
   fetchNotifications,
   markNotificationRead,
+  markNotificationUnread,
   markAllRead,
 };

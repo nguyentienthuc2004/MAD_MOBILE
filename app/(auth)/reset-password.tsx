@@ -1,13 +1,14 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
 import {
-    KeyboardAvoidingView,
-    Platform,
-    Pressable,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
 import { authService } from "../../services/auth.service";
 
@@ -20,6 +21,23 @@ export default function ResetPasswordScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const submitResetPassword = async (logoutOtherDevices: boolean) => {
+    setLoading(true);
+    setError(null);
+    try {
+      await authService.resetPassword({
+        resetToken,
+        newPassword,
+        logoutOtherDevices,
+      });
+      router.push({ pathname: "/login" });
+    } catch (e: any) {
+      setError(e?.message ?? "Lỗi mạng");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleReset = async () => {
     if (newPassword.length < 6) {
       setError("Mật khẩu phải có ít nhất 6 ký tự");
@@ -29,16 +47,26 @@ export default function ResetPasswordScreen() {
       setError("Mật khẩu nhập lại không khớp");
       return;
     }
-    setLoading(true);
-    setError(null);
-    try {
-      await authService.resetPassword({ resetToken, newPassword });
-      router.push({ pathname: "/login" });
-    } catch (e: any) {
-      setError(e?.message ?? "Lỗi mạng");
-    } finally {
-      setLoading(false);
-    }
+
+    Alert.alert(
+      "Đăng xuất thiết bị khác",
+      "Bạn có muốn đăng xuất khỏi tất cả thiết bị khác không?",
+      [
+        {
+          text: "Không",
+          onPress: () => {
+            void submitResetPassword(false);
+          },
+        },
+        {
+          text: "Có",
+          onPress: () => {
+            void submitResetPassword(true);
+          },
+        },
+      ],
+      { cancelable: true },
+    );
   };
 
   return (
