@@ -1,37 +1,76 @@
+import { useAuth } from "@/hooks/useAuth";
+import { chatService } from "@/services/chat.service";
+import { userService, type AppUser } from "@/services/user.service";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
-import { Alert, FlatList, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import {
+    ActivityIndicator,
+    Alert,
+    FlatList,
+    Image,
+    Pressable,
+    StyleSheet,
+    Text,
+    TextInput,
+    View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-
-import { chatService } from "@/services/chat.service";
-import { userService, type AppUser } from "@/services/user.service";
 
 export default function CreateGroupScreen() {
     const router = useRouter();
+    const { user } = useAuth();
+
+    const [loading, setLoading] = useState(true);
+    const [submitting, setSubmitting] = useState(false);
+
     const [groupName, setGroupName] = useState("");
     const [keyword, setKeyword] = useState("");
-    const [users, setUsers] = useState<AppUser[]>([]);
+    const [allUsers, setAllUsers] = useState<AppUser[]>([]);
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
     useEffect(() => {
-        const fetchUsers = async () => {
-            try {
-                const res = await userService.getUsers();
-                setUsers(res.data ?? []);
-            } catch {
-                setUsers([]);
-            }
-        };
-
-        void fetchUsers();
+        void bootstrap();
     }, []);
 
-    const filteredUsers = useMemo(() => {
-        const q = keyword.trim().toLowerCase();
-        if (!q) return users;
-        return users.filter((u) => (u.displayName || u.username).toLowerCase().includes(q));
-    }, [keyword, users]);
+    const bootstrap = async () => {
+        setLoading(true);
+        try {
+            const res = await userService.getUsers();
+            const users = (res as any)?.data ?? [];
+            setAllUsers(Array.isArray(users) ? users : []);
+        } catch {
+            setAllUsers([]);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const selectableUsers = useMemo(() => {
+        const meId = user?._id ? String(user._id) : "";
+        const kw = keyword.trim().toLowerCase();
+
+        return allUsers
+            .filter((u) => {
+                const id = String(u._id);
+                if (!id) return false;
+                if (id === meId) return false;
+
+                if (!kw) return true;
+                const hay = `${u.username || ""} ${u.displayName || ""} ${u.fullName || ""}`
+                    .toLowerCase()
+                    .trim();
+                return hay.includes(kw);
+            })
+            .slice(0, 200);
+    }, [allUsers, keyword, user?._id]);
+
+    const selectedIdSet = useMemo(() => new Set(selectedIds), [selectedIds]);
+
+    const selectedUsers = useMemo(() => {
+        if (!selectedIds.length) return [];
+        return allUsers.filter((u) => selectedIdSet.has(String(u._id)));
+    }, [allUsers, selectedIdSet, selectedIds.length]);
 
     const toggleSelect = (id: string) => {
         setSelectedIds((prev) =>
@@ -40,21 +79,37 @@ export default function CreateGroupScreen() {
     };
 
     const handleCreateGroup = async () => {
-        if (!groupName.trim() || !selectedIds.length) return;
+        const title = groupName.trim();
+        if (!title) {
+            Alert.alert("Thông báo", "Bạn chưa nhập tên nhóm");
+            return;
+        }
+        if (!selectedIds.length) {
+            Alert.alert("Thông báo", "Bạn chưa chọn thành viên nào");
+            return;
+        }
 
+        setSubmitting(true);
         try {
-            const res = await chatService.createGroup(groupName.trim(), selectedIds);
-            const group = res.data?.group;
-            if (!group) {
+            const res = await chatService.createGroup(title, selectedIds);
+            if (!(res as any)?.success) {
+                Alert.alert("Lỗi", (res as any)?.message || "Không tạo được nhóm chat");
+                return;
+            }
+
+            const group = (res as any)?.data?.group;
+            if (!group?._id) {
                 throw new Error("Không nhận được nhóm chat");
             }
 
             router.replace({
                 pathname: "/(chats)/[roomId]",
-                params: { roomId: group._id, name: group.title as string },
+                params: { roomId: String(group._id), name: String(group.title || title) },
             });
         } catch (error: any) {
             Alert.alert("Lỗi", error?.message || "Không tạo được nhóm chat");
+        } finally {
+            setSubmitting(false);
         }
     };
 
@@ -64,103 +119,153 @@ export default function CreateGroupScreen() {
                 <Pressable style={styles.backButton} onPress={() => router.back()}>
                     <Ionicons name="chevron-back" size={24} color="#111" />
                 </Pressable>
-                <Text style={styles.headerTitle}>Tạo nhóm chat</Text>
-            </View>
-
-            <View style={styles.groupMetaWrap}>
-                <Pressable
-                    style={styles.groupAvatar}
-                    onPress={() => {
-                        // TODO: mở picker để chọn ảnh nhóm
-                    }}
-                >
-                    <Ionicons name="camera-outline" size={22} color="#6b7280" />
-                </Pressable>
-                <View style={styles.groupNameWrap}>
-                    <Text style={styles.groupNameLabel}>Tên nhóm</Text>
-                    <TextInput
-                        style={styles.groupNameInput}
-                        placeholder="Nhập tên nhóm..."
-                        placeholderTextColor="#9ca3af"
-                        value={groupName}
-                        onChangeText={setGroupName}
-                    />
-                </View>
-            </View>
-
-            <View style={styles.searchWrap}>
-                <Ionicons name="search" size={18} color="#9ca3af" style={styles.searchIcon} />
-                <TextInput
-                    style={styles.searchInput}
-                    placeholder="Tìm bạn bè..."
-                    placeholderTextColor="#9ca3af"
-                    value={keyword}
-                    onChangeText={setKeyword}
-                />
-            </View>
-
-            <FlatList
-                data={filteredUsers}
-                keyExtractor={(item) => item._id}
-                contentContainerStyle={styles.listContent}
-                renderItem={({ item }) => {
-                    const isSelected = selectedIds.includes(item._id);
-                    return (
-                        <Pressable
-                            style={styles.userRow}
-                            onPress={() => toggleSelect(item._id)}
-                        >
-                            <View style={styles.checkboxWrap}>
-                                <Ionicons
-                                    name={isSelected ? "checkmark-circle" : "ellipse-outline"}
-                                    size={22}
-                                    color={isSelected ? "#0a84ff" : "#9ca3af"}
-                                />
-                            </View>
-                            <View style={styles.avatarCircle}>
-                                <Text style={styles.avatarInitial}>
-                                    {(item.displayName || item.username).charAt(0).toUpperCase()}
-                                </Text>
-                            </View>
-                            <View style={styles.userInfo}>
-                                <Text style={styles.userName} numberOfLines={1}>
-                                    {item.displayName || item.username}
-                                </Text>
-                                <Text style={styles.userSub} numberOfLines={1}>
-                                    @{item.username}
-                                </Text>
-                            </View>
-                        </Pressable>
-                    );
-                }}
-                ListEmptyComponent={
-                    <View style={styles.emptyWrap}>
-                        <Text style={styles.emptyText}>Không tìm thấy bạn bè phù hợp.</Text>
-                    </View>
-                }
-            />
-
-            <View style={styles.footer}>
-                <Text style={styles.footerText}>
-                    Đã chọn {selectedIds.length} người
+                <Text style={styles.headerTitle} numberOfLines={1}>
+                    Tạo nhóm chat
                 </Text>
                 <Pressable
-                    style={[styles.createButton, !selectedIds.length && styles.createButtonDisabled]}
+                    style={[
+                        styles.headerAction,
+                        submitting || loading || !groupName.trim() || !selectedIds.length
+                            ? styles.headerActionDisabled
+                            : null,
+                    ]}
                     onPress={handleCreateGroup}
-                    disabled={!selectedIds.length}
+                    disabled={submitting || loading || !groupName.trim() || !selectedIds.length}
                 >
-                    <Text style={styles.createButtonText}>Tạo nhóm</Text>
+                    <Text style={styles.headerActionText}>{submitting ? "Đang tạo..." : "Tạo"}</Text>
                 </Pressable>
             </View>
+
+            {loading ? (
+                <ActivityIndicator style={{ marginTop: 24 }} size="large" color="#0a84ff" />
+            ) : (
+                <View style={{ flex: 1 }}>
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>Thông tin nhóm</Text>
+                        <View style={styles.groupMetaWrap}>
+                            <Pressable
+                                style={styles.groupAvatar}
+                                onPress={() => {
+                                    // TODO: mở picker để chọn ảnh nhóm
+                                }}
+                            >
+                                <Ionicons name="camera-outline" size={22} color="#6b7280" />
+                            </Pressable>
+                            <View style={styles.groupNameWrap}>
+                                <Text style={styles.groupNameLabel}>Tên nhóm</Text>
+                                <TextInput
+                                    style={styles.groupNameInput}
+                                    placeholder="Nhập tên nhóm..."
+                                    placeholderTextColor="#9ca3af"
+                                    value={groupName}
+                                    onChangeText={setGroupName}
+                                />
+                            </View>
+                        </View>
+                    </View>
+
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>Chọn thành viên</Text>
+                        <View style={styles.searchWrap}>
+                            <Ionicons name="search-outline" size={18} color="#6b7280" />
+                            <TextInput
+                                style={styles.searchInput}
+                                placeholder="Tìm theo username/tên..."
+                                placeholderTextColor="#9ca3af"
+                                value={keyword}
+                                onChangeText={setKeyword}
+                            />
+                            {keyword.trim() ? (
+                                <Pressable onPress={() => setKeyword("")} style={{ padding: 6 }}>
+                                    <Ionicons name="close-circle" size={18} color="#9ca3af" />
+                                </Pressable>
+                            ) : null}
+                        </View>
+
+                        <Text style={styles.selectedTitle}>Đã chọn ({selectedIds.length})</Text>
+                        {selectedUsers.length ? (
+                            <FlatList
+                                data={selectedUsers}
+                                keyExtractor={(u) => String(u._id)}
+                                horizontal
+                                showsHorizontalScrollIndicator={false}
+                                contentContainerStyle={{ paddingHorizontal: 12, paddingBottom: 10 }}
+                                renderItem={({ item }) => {
+                                    const title = item.displayName || item.fullName || item.username;
+                                    const avatar = item.avatarUrl;
+                                    return (
+                                        <View style={styles.selectedUserItem}>
+                                            <View style={styles.selectedAvatarWrap}>
+                                                {avatar ? (
+                                                    <Image
+                                                        source={{ uri: avatar }}
+                                                        style={styles.selectedAvatar}
+                                                    />
+                                                ) : (
+                                                    <View style={styles.selectedAvatarFallback}>
+                                                        <Text style={styles.selectedAvatarInitial}>
+                                                            {(String(title || "?") || "?")
+                                                                .charAt(0)
+                                                                .toUpperCase()}
+                                                        </Text>
+                                                    </View>
+                                                )}
+                                            </View>
+                                            <Text style={styles.selectedUserName} numberOfLines={1}>
+                                                {title}
+                                            </Text>
+                                        </View>
+                                    );
+                                }}
+                            />
+                        ) : (
+                            <Text style={styles.helperText}>Chưa chọn thành viên nào.</Text>
+                        )}
+
+                        <FlatList
+                            data={selectableUsers}
+                            keyExtractor={(u) => String(u._id)}
+                            renderItem={({ item }) => {
+                                const id = String(item._id);
+                                const selected = selectedIdSet.has(id);
+                                const title = item.displayName || item.fullName || item.username;
+
+                                return (
+                                    <Pressable
+                                        style={[styles.userRow, selected ? styles.userRowSelected : null]}
+                                        onPress={() => toggleSelect(id)}
+                                    >
+                                        <Ionicons
+                                            name={selected ? "checkbox-outline" : "square-outline"}
+                                            size={22}
+                                            color={selected ? "#0a84ff" : "#9ca3af"}
+                                            style={{ marginRight: 10 }}
+                                        />
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={styles.userTitle} numberOfLines={1}>
+                                                {title}
+                                            </Text>
+                                            <Text style={styles.userSub} numberOfLines={1}>
+                                                @{item.username}
+                                            </Text>
+                                        </View>
+                                    </Pressable>
+                                );
+                            }}
+                            contentContainerStyle={{ paddingHorizontal: 12, paddingBottom: 24 }}
+                            ListEmptyComponent={
+                                <Text style={styles.emptyTextInline}>Không có người dùng phù hợp.</Text>
+                            }
+                        />
+                    </View>
+                </View>
+            )}
         </SafeAreaView>
     );
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: "#fff",
-    },
+    container: { flex: 1, backgroundColor: "#fff" },
     header: {
         height: 52,
         flexDirection: "row",
@@ -169,38 +274,30 @@ const styles = StyleSheet.create({
         borderBottomWidth: StyleSheet.hairlineWidth,
         borderBottomColor: "#e5e5e5",
     },
-    backButton: {
-        paddingRight: 8,
-        paddingVertical: 4,
-        marginRight: 4,
+    backButton: { paddingRight: 8, paddingVertical: 4, marginRight: 4 },
+    headerTitle: { flex: 1, fontSize: 17, fontWeight: "600", color: "#111" },
+    headerAction: {
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 8,
+        backgroundColor: "#0a84ff",
     },
-    headerTitle: {
-        fontSize: 17,
+    headerActionDisabled: { opacity: 0.6 },
+    headerActionText: { color: "#fff", fontWeight: "600" },
+
+    section: { paddingTop: 12 },
+    sectionTitle: {
+        paddingHorizontal: 12,
+        marginBottom: 10,
+        fontSize: 14,
         fontWeight: "600",
         color: "#111",
     },
-    searchWrap: {
-        flexDirection: "row",
-        alignItems: "center",
-        marginTop: 12,
-        marginHorizontal: 16,
-        paddingHorizontal: 12,
-        borderRadius: 20,
-        backgroundColor: "#f3f4f6",
-    },
-    searchIcon: {
-        marginRight: 6,
-    },
-    searchInput: {
-        flex: 1,
-        height: 38,
-        fontSize: 14,
-    },
+
     groupMetaWrap: {
         flexDirection: "row",
         alignItems: "center",
-        paddingHorizontal: 16,
-        paddingTop: 12,
+        paddingHorizontal: 12,
     },
     groupAvatar: {
         width: 56,
@@ -226,84 +323,77 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: "#111",
     },
-    listContent: {
-        paddingTop: 4,
-        paddingBottom: 80,
-    },
-    userRow: {
-        flexDirection: "row",
+
+    helperText: { color: "#6b7280", paddingHorizontal: 12, paddingTop: 2 },
+    emptyTextInline: { color: "#6b7280", paddingHorizontal: 12, paddingTop: 8 },
+
+    selectedUserItem: {
+        width: 76,
+        marginRight: 12,
         alignItems: "center",
-        paddingHorizontal: 16,
-        paddingVertical: 10,
+        paddingBottom: 4,
     },
-    checkboxWrap: {
-        marginRight: 8,
+    selectedAvatarWrap: {
+        width: 56,
+        height: 56,
+        marginBottom: 6,
     },
-    avatarCircle: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
+    selectedAvatar: {
+        width: "100%",
+        height: "100%",
+        borderRadius: 28,
+    },
+    selectedAvatarFallback: {
+        width: "100%",
+        height: "100%",
+        borderRadius: 28,
         backgroundColor: "#e5e7eb",
         alignItems: "center",
         justifyContent: "center",
-        marginRight: 10,
     },
-    avatarInitial: {
-        fontSize: 16,
-        fontWeight: "600",
+    selectedAvatarInitial: {
+        fontSize: 18,
+        fontWeight: "700",
         color: "#4b5563",
     },
-    userInfo: {
-        flex: 1,
-    },
-    userName: {
-        fontSize: 14,
-        fontWeight: "500",
-        color: "#111",
-    },
-    userSub: {
+    selectedUserName: {
         fontSize: 12,
-        color: "#6b7280",
-        marginTop: 2,
+        lineHeight: 16,
+        color: "#111",
+        textAlign: "center",
+        paddingHorizontal: 2,
     },
-    emptyWrap: {
-        paddingVertical: 24,
-        alignItems: "center",
-    },
-    emptyText: {
-        fontSize: 13,
-        color: "#6b7280",
-    },
-    footer: {
-        position: "absolute",
-        left: 0,
-        right: 0,
-        bottom: 0,
+
+    searchWrap: {
         flexDirection: "row",
         alignItems: "center",
-        justifyContent: "space-between",
-        paddingHorizontal: 16,
-        paddingVertical: 10,
-        borderTopWidth: StyleSheet.hairlineWidth,
-        borderTopColor: "#e5e5e5",
-        backgroundColor: "#fff",
-    },
-    footerText: {
-        fontSize: 13,
-        color: "#4b5563",
-    },
-    createButton: {
-        paddingHorizontal: 16,
+        marginHorizontal: 12,
+        backgroundColor: "#f3f4f6",
+        borderRadius: 10,
+        paddingHorizontal: 10,
         paddingVertical: 8,
-        borderRadius: 20,
-        backgroundColor: "#0a84ff",
+        marginBottom: 10,
     },
-    createButtonDisabled: {
-        backgroundColor: "#9ca3af",
-    },
-    createButtonText: {
-        fontSize: 14,
+    searchInput: { flex: 1, marginLeft: 8, color: "#111" },
+
+    selectedTitle: {
+        paddingHorizontal: 12,
+        marginBottom: 8,
+        fontSize: 13,
         fontWeight: "600",
-        color: "#fff",
+        color: "#111",
     },
+
+    userRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        backgroundColor: "#f9fafb",
+        borderRadius: 10,
+        paddingHorizontal: 12,
+        paddingVertical: 12,
+        marginBottom: 10,
+    },
+    userRowSelected: { backgroundColor: "#eef2ff" },
+    userTitle: { fontSize: 15, fontWeight: "600", color: "#111" },
+    userSub: { fontSize: 12, color: "#6b7280", marginTop: 2 },
 });

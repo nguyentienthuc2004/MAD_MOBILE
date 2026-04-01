@@ -84,7 +84,7 @@ export default function ChatManageScreen() {
                         try {
                             await chatService.deleteRoom(String(roomId));
                             Alert.alert("Đã xóa", "Đoạn chat đã được xóa.");
-                            router.back();
+                            router.replace("/(tabs)/chat");
                         } catch (err: any) {
                             Alert.alert("Lỗi", err?.message || "Không thể xoá đoạn chat");
                         }
@@ -393,7 +393,7 @@ export default function ChatManageScreen() {
                 )}
             </View>
 
-            <View style={styles.section}>
+            {/* <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Thông báo</Text>
 
                 <View style={styles.row}>
@@ -411,7 +411,7 @@ export default function ChatManageScreen() {
                         onValueChange={handleToggleNotification}
                     />
                 </View>
-            </View>
+            </View> */}
 
             <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Hành động khác</Text>
@@ -429,7 +429,7 @@ export default function ChatManageScreen() {
                     <Ionicons name="chevron-forward" size={18} color="#9ca3af" />
                 </Pressable>
 
-                <Pressable style={styles.row} onPress={handleBlock}>
+                {/* <Pressable style={styles.row} onPress={handleBlock}>
                     <View style={styles.rowLeft}>
                         <Ionicons
                             name="hand-right-outline"
@@ -440,7 +440,7 @@ export default function ChatManageScreen() {
                         <Text style={[styles.rowTitle, styles.dangerText]}>Chặn</Text>
                     </View>
                     <Ionicons name="chevron-forward" size={18} color="#9ca3af" />
-                </Pressable>
+                </Pressable> */}
             </View>
 
             {/* Modal tìm tin nhắn */}
