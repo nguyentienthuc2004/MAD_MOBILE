@@ -103,9 +103,8 @@ export default function Home() {
       }
 
       // Lấy danh sách userId của followers và following
-      const followerIds = (followersRes.data ?? []).map((u) => u._id);
       const followingIds = (followingRes.data ?? []).map((u) => u._id);
-      followSet = new Set([...followerIds, ...followingIds]);
+      followSet = new Set(followingIds);
 
       return {
         posts,
