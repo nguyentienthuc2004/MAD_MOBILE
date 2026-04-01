@@ -8,10 +8,9 @@ import {
     Modal,
     Pressable,
     StyleSheet,
-    Switch,
     Text,
     TextInput,
-    View,
+    View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { chatService } from "../../services/chat.service";
@@ -34,6 +33,7 @@ export default function ChatManageScreen() {
     // const [newGroupAvatar, setNewGroupAvatar] = useState("");
     const [loadingEdit, setLoadingEdit] = useState(false);
     const [pickedAvatarUri, setPickedAvatarUri] = useState<string>("");
+    const [leavingGroup, setLeavingGroup] = useState(false);
 
     const hasUserProfile = typeof userId === "string" && userId.length > 0;
 
@@ -94,6 +94,39 @@ export default function ChatManageScreen() {
         );
     };
 
+    const handleLeaveGroup = async () => {
+        if (!roomId) return;
+
+        Alert.alert(
+            "Rời khỏi nhóm",
+            "Bạn có chắc muốn rời khỏi nhóm chat này?",
+            [
+                { text: "Hủy", style: "cancel" },
+                {
+                    text: "Rời nhóm",
+                    style: "destructive",
+                    onPress: async () => {
+                        try {
+                            setLeavingGroup(true);
+                            const res = await chatService.leaveGroup(String(roomId));
+                            if (!res?.success) {
+                                Alert.alert("Lỗi", res?.message || "Không thể rời khỏi nhóm");
+                                return;
+                            }
+
+                            Alert.alert("Thành công", "Bạn đã rời khỏi nhóm.");
+                            router.replace("/(tabs)/chat");
+                        } catch (err: any) {
+                            Alert.alert("Lỗi", err?.message || "Không thể rời khỏi nhóm");
+                        } finally {
+                            setLeavingGroup(false);
+                        }
+                    },
+                },
+            ],
+        );
+    };
+
     const handleBlock = () => {
         Alert.alert(
             "Chặn",
@@ -138,11 +171,13 @@ export default function ChatManageScreen() {
         }
         setLoadingEdit(true);
         try {
-            const avatarUrl = pickedAvatarUri;
-            const res = await chatService.updateRoomAvatar(roomId, avatarUrl);
+            const res = await chatService.updateRoomAvatar(roomId, pickedAvatarUri);
             console.log("Dữ liệu trả về avatar:", res);
             if (res.success) {
-                setGroupAvatar(avatarUrl);
+                const nextAvatar = (res as any)?.data?.room?.avatar || (res as any)?.data?.avatarUrl;
+                if (nextAvatar) {
+                    setGroupAvatar(nextAvatar);
+                }
                 setShowEditAvatarModal(false);
                 setPickedAvatarUri("");
                 Alert.alert("Thành công", "Đã đổi avatar nhóm");
@@ -415,6 +450,23 @@ export default function ChatManageScreen() {
 
             <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Hành động khác</Text>
+
+                {roomType === "group" ? (
+                    <Pressable style={styles.row} onPress={handleLeaveGroup} disabled={leavingGroup}>
+                        <View style={styles.rowLeft}>
+                            <Ionicons
+                                name="log-out-outline"
+                                size={20}
+                                color="#ef4444"
+                                style={styles.rowIcon}
+                            />
+                            <Text style={[styles.rowTitle, styles.dangerText]}>
+                                {leavingGroup ? "Đang rời nhóm..." : "Rời nhóm"}
+                            </Text>
+                        </View>
+                        <Ionicons name="chevron-forward" size={18} color="#9ca3af" />
+                    </Pressable>
+                ) : null}
 
                 <Pressable style={styles.row} onPress={handleDeleteChat}>
                     <View style={styles.rowLeft}>
