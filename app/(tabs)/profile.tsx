@@ -9,23 +9,27 @@ import { useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Alert,
-  Dimensions,
   Image,
   Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const GRID_GAP = 2;
-const GRID_ITEM_SIZE = (Dimensions.get("window").width - GRID_GAP * 2) / 3;
 const FALLBACK_POST_IMAGE = "https://placehold.co/1080x1080?text=Post";
 
 const ProfileScreen = () => {
   const router = useRouter();
+  const { width: screenWidth } = useWindowDimensions();
+  const gridItemSize = Math.max(
+    Math.floor((screenWidth - GRID_GAP * 2) / 3),
+    0,
+  );
   const user = useAuth((state) => state.user);
   const refetchMe = useAuth((state) => state.refetchMe);
   const { request, loading, error } = useApi<ApiResponse<ApiPost[]>>();
@@ -284,7 +288,7 @@ const ProfileScreen = () => {
               <Pressable
                 key={item.id}
                 onPress={() => handlePressGridPost(item)}
-                style={styles.gridItem}
+                style={[styles.gridItem, { width: gridItemSize }]}
               >
                 <Image
                   source={{ uri: item.images[0] }}
@@ -342,27 +346,6 @@ const styles = StyleSheet.create({
   },
   // Đưa các style này vào đúng chỗ bên dưới
   avatar: {
-    tabBtn: {
-      flex: 1,
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "center",
-      paddingVertical: 8,
-      borderBottomWidth: 2,
-      borderColor: "transparent",
-    },
-    tabBtnActive: {
-      borderColor: "#111",
-    },
-    tabBtnText: {
-      marginLeft: 6,
-      fontSize: 14,
-      color: "#aaa",
-      fontWeight: "600",
-    },
-    tabBtnTextActive: {
-      color: "#111",
-    },
     width: 86,
     height: 86,
     borderRadius: 43,
@@ -463,13 +446,12 @@ const styles = StyleSheet.create({
     gap: GRID_GAP,
   },
   gridItem: {
-    width: GRID_ITEM_SIZE,
-    height: GRID_ITEM_SIZE,
     position: "relative",
+    aspectRatio: 1,
   },
   gridImage: {
-    width: GRID_ITEM_SIZE,
-    height: GRID_ITEM_SIZE,
+    width: "100%",
+    height: "100%",
   },
   sensitiveGridOverlay: {
     ...StyleSheet.absoluteFillObject,

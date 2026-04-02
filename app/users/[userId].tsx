@@ -11,24 +11,28 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Alert,
-  Dimensions,
   Image,
   Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const GRID_GAP = 2;
-const GRID_ITEM_SIZE = (Dimensions.get("window").width - GRID_GAP * 2) / 3;
 const FALLBACK_POST_IMAGE = "https://placehold.co/1080x1080?text=Post";
 const FALLBACK_AVATAR_URL = "https://placehold.co/200x200?text=User";
 
 export default function UserProfileScreen() {
   const router = useRouter();
+  const { width: screenWidth } = useWindowDimensions();
+  const gridItemSize = Math.max(
+    Math.floor((screenWidth - GRID_GAP * 2) / 3),
+    0,
+  );
   const { userId } = useLocalSearchParams<{ userId?: string }>();
   const targetUserId = typeof userId === "string" ? userId : "";
   console.log(
@@ -377,7 +381,7 @@ export default function UserProfileScreen() {
               <Pressable
                 key={item.id}
                 onPress={() => handlePressGridPost(item)}
-                style={styles.gridItem}
+                style={[styles.gridItem, { width: gridItemSize }]}
               >
                 <Image
                   source={{ uri: item.images[0] }}
@@ -519,13 +523,12 @@ const styles = StyleSheet.create({
     gap: GRID_GAP,
   },
   gridItem: {
-    width: GRID_ITEM_SIZE,
-    height: GRID_ITEM_SIZE,
     position: "relative",
+    aspectRatio: 1,
   },
   gridImage: {
-    width: GRID_ITEM_SIZE,
-    height: GRID_ITEM_SIZE,
+    width: "100%",
+    height: "100%",
   },
   sensitiveGridOverlay: {
     ...StyleSheet.absoluteFillObject,

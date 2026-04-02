@@ -8,7 +8,6 @@ import { Audio, type AVPlaybackStatus } from "expo-av";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Dimensions,
   FlatList,
   Image,
   NativeScrollEvent,
@@ -18,13 +17,11 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-const SCREEN_WIDTH = Dimensions.get("window").width;
-const PREVIEW_SIZE = SCREEN_WIDTH;
-const CAROUSEL_WIDTH = PREVIEW_SIZE - 24;
 const API_ORIGIN = API_BASE_URL.replace(/\/api\/?$/, "");
 
 type SearchParams = {
@@ -145,6 +142,8 @@ const resolveMediaUrl = (rawUrl?: string): string => {
 };
 
 export default function CreatePostMusicScreen() {
+  const { width: screenWidth } = useWindowDimensions();
+  const carouselWidth = Math.max(screenWidth - 24, 1);
   const router = useRouter();
   const params = useLocalSearchParams<SearchParams>();
   const { request, loading, error } = useApi<ApiResponse<Music[]>>();
@@ -333,11 +332,11 @@ export default function CreatePostMusicScreen() {
       }
 
       const offsetX = event.nativeEvent.contentOffset.x;
-      const nextIndex = Math.round(offsetX / CAROUSEL_WIDTH);
+      const nextIndex = Math.round(offsetX / carouselWidth);
       const boundedIndex = Math.max(0, Math.min(nextIndex, selectedImageUris.length - 1));
       setActiveImageIndex(boundedIndex);
     },
-    [selectedImageUris.length]
+    [carouselWidth, selectedImageUris.length]
   );
 
   const fetchMusics = useCallback(async () => {
@@ -532,7 +531,9 @@ export default function CreatePostMusicScreen() {
         <Text style={styles.sectionTitle}>Ảnh đã chọn</Text>
 
         {selectedImageUris.length > 0 ? (
-          <View style={styles.previewWrap}>
+          <View
+            style={[styles.previewWrap, { width: carouselWidth, height: carouselWidth }]}
+          >
             <FlatList
               data={selectedImageUris}
               keyExtractor={(item, index) => `${item}-${index}`}
@@ -541,7 +542,10 @@ export default function CreatePostMusicScreen() {
               showsHorizontalScrollIndicator={false}
               onMomentumScrollEnd={handleImageSwipeEnd}
               renderItem={({ item }) => (
-                <Image source={{ uri: item }} style={styles.previewImage} />
+                <Image
+                  source={{ uri: item }}
+                  style={[styles.previewImage, { width: carouselWidth, height: carouselWidth }]}
+                />
               )}
             />
 
@@ -739,15 +743,11 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
   },
   previewWrap: {
-    width: CAROUSEL_WIDTH,
-    height: CAROUSEL_WIDTH,
     borderRadius: 12,
     overflow: "hidden",
     backgroundColor: "#0f0f0f",
   },
   previewImage: {
-    width: CAROUSEL_WIDTH,
-    height: CAROUSEL_WIDTH,
   },
   previewCounterBadge: {
     position: "absolute",
