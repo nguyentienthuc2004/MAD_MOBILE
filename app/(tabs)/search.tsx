@@ -14,24 +14,29 @@ import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  Dimensions,
   FlatList,
   Image,
   Pressable,
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const GRID_GAP = 2;
-const GRID_ITEM_SIZE = (Dimensions.get("window").width - GRID_GAP * 2) / 3;
 const FALLBACK_AVATAR = "https://placehold.co/100x100/e2e8f0/64748b?text=U";
 const FALLBACK_POST_IMAGE = "https://placehold.co/400x400/e2e8f0/64748b?text=P";
 
 const SearchScreen = () => {
   const router = useRouter();
+  const { width: screenWidth } = useWindowDimensions();
+  const gridItemSize = Math.max(
+    Math.floor((screenWidth - GRID_GAP * 2) / 3),
+    0,
+  );
+  const gridItemStyle = { width: gridItemSize };
   const currentUser = useAuth((s) => s.user);
 
   // Search state
@@ -237,7 +242,11 @@ const SearchScreen = () => {
     };
 
     return (
-      <Pressable key={item._id} style={styles.gridItem} onPress={handlePress}>
+      <Pressable
+        key={item._id}
+        style={[styles.gridItem, gridItemStyle]}
+        onPress={handlePress}
+      >
         <Image
           source={{ uri: imageUri }}
           blurRadius={isBlocked ? 20 : 0}
@@ -281,7 +290,11 @@ const SearchScreen = () => {
     };
 
     return (
-      <Pressable key={item._id} style={styles.gridItem} onPress={handlePress}>
+      <Pressable
+        key={item._id}
+        style={[styles.gridItem, gridItemStyle]}
+        onPress={handlePress}
+      >
         <Image
           source={{ uri: imageUri }}
           blurRadius={isBlocked ? 20 : 0}
@@ -373,11 +386,9 @@ const SearchScreen = () => {
             <View style={styles.postsGridWrap}>
               <Text style={styles.sectionTitle}>Bài viết</Text>
               <View style={styles.gridWrap}>
-                {searchPostResults.map((p) => (
-                  <View key={p._id} style={styles.gridItem}>
-                    {renderSearchPostGridItem({ item: p })}
-                  </View>
-                ))}
+                {searchPostResults.map((p) =>
+                  renderSearchPostGridItem({ item: p }),
+                )}
               </View>
             </View>
           )}
@@ -566,9 +577,8 @@ const styles = StyleSheet.create({
     gap: GRID_GAP,
   },
   gridItem: {
-    width: GRID_ITEM_SIZE,
-    height: GRID_ITEM_SIZE,
     marginBottom: GRID_GAP,
+    aspectRatio: 1,
   },
   gridImage: {
     width: "100%",
