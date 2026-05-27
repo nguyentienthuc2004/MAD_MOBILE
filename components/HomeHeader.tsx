@@ -3,6 +3,10 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 
+/**
+ * Header trang Home hien logo va nut truy cap chat.
+ * @returns JSX Element
+ */
 export default function HomeHeader() {
   const unread = useChatStore((s) => s.unreadCount);
   return (

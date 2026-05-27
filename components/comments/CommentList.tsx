@@ -33,11 +33,31 @@ type Props = {
 
 type ListItem = Comment & { isReply?: boolean };
 
+/**
+ * Lay id cua binh luan tu nhieu truong kha nhau.
+ * @param c Binh luan
+ * @returns ID
+ */
 const getId = (c: Partial<Comment> & { _id?: string; id?: string }) =>
   (c as any).id ?? (c as any)._id;
 
+/**
+ * Chuan hoa comment de co truong id.
+ * @param c Binh luan tu API
+ * @returns Binh luan da chuan hoa
+ */
 const normalize = (c: any) => ({ ...c, id: getId(c) });
 
+/**
+ * Danh sach binh luan va reply, ho tro thao tac CRUD.
+ * @param postId ID bai viet
+ * @param onReplyRequested Callback khi muon reply
+ * @param onCommentAdded Callback khi them
+ * @param onEditRequested Callback khi sua
+ * @param highlightId ID can highlight
+ * @param headerComponent Header component
+ * @returns JSX Element
+ */
 function CommentList(
   {
     postId,
@@ -65,11 +85,20 @@ function CommentList(
   const [sheetVisible, setSheetVisible] = useState(false);
   const [sheetComment, setSheetComment] = useState<Comment | null>(null);
 
+  /**
+   * Mo bottom sheet hanh dong cho binh luan.
+   * @param comment Binh luan duoc chon
+   * @returns void
+   */
   const showSheet = (comment: Comment) => {
     setSheetComment(comment);
     setSheetVisible(true);
   };
 
+  /**
+   * Dong bottom sheet.
+   * @returns void
+   */
   const closeSheet = () => {
     setSheetVisible(false);
     setSheetComment(null);
@@ -78,11 +107,21 @@ function CommentList(
   const [confirmVisible, setConfirmVisible] = useState(false);
   const [confirmTargetId, setConfirmTargetId] = useState<string | null>(null);
 
+  /**
+   * Mo hop thoai xac nhan xoa binh luan.
+   * @param id ID binh luan
+   * @returns void
+   */
   const showConfirm = (id: string) => {
     setConfirmTargetId(id);
     setConfirmVisible(true);
   };
 
+  /**
+   * Thuc hien xoa binh luan sau khi xac nhan.
+   * @returns void
+   * @sideEffect Goi API va cap nhat danh sach.
+   */
   const doConfirmDelete = async () => {
     const id = confirmTargetId;
     if (!id) {
@@ -102,6 +141,11 @@ function CommentList(
     }
   };
 
+  /**
+   * Tai danh sach binh luan goc.
+   * @returns void
+   * @sideEffect Goi API va cap nhat state.
+   */
   const loadRoot = useCallback(async () => {
     try {
       setLoading(true);
@@ -119,6 +163,11 @@ function CommentList(
     loadRoot();
   }, [loadRoot]);
 
+  /**
+   * Refresh danh sach binh luan.
+   * @returns void
+   * @sideEffect Goi API va reset cache replies.
+   */
   const onRefresh = async () => {
     try {
       setRefreshing(true);
@@ -134,6 +183,12 @@ function CommentList(
     }
   };
 
+  /**
+   * Mo/thu danh sach reply cua binh luan.
+   * @param comment Binh luan cha
+   * @returns void
+   * @sideEffect Goi API lay replies neu chua co.
+   */
   const toggleReplies = async (comment: Comment) => {
     const id = getId(comment);
     if (!id) return;
@@ -163,6 +218,11 @@ function CommentList(
     }
   };
 
+  /**
+   * Xoa binh luan khoi state.
+   * @param commentId ID binh luan
+   * @returns void
+   */
   const removeComment = (commentId: string) => {
     setRootComments((list) => list.filter((c) => c.id !== commentId));
     setRepliesCache((s) => {
@@ -175,6 +235,11 @@ function CommentList(
     });
   };
 
+  /**
+   * Cap nhat binh luan trong state.
+   * @param updated Binh luan moi
+   * @returns void
+   */
   const updateComment = (updated: Comment) => {
     setRootComments((list) =>
       list.map((c) => (c.id === updated.id ? { ...c, ...updated } : c)),
@@ -191,6 +256,9 @@ function CommentList(
     });
   };
 
+  /**
+   * API imperative de ben ngoai thao tac danh sach comment.
+   */
   useImperativeHandle(ref, () => ({
     addComment: (c: Comment) => {
       if (c.parentCommentId == null) {
@@ -308,6 +376,11 @@ function CommentList(
     },
   }));
 
+  /**
+   * Chen binh luan moi vao danh sach.
+   * @param newComment Binh luan moi
+   * @returns void
+   */
   const handleCommentAdded = (newComment: Comment) => {
     if (newComment.parentCommentId == null) {
       setRootComments((s) => [normalize(newComment), ...s]);
@@ -330,11 +403,20 @@ function CommentList(
     onCommentAdded?.(newComment);
   };
 
+  /**
+   * Mo action sheet khi nhan giu binh luan.
+   * @param comment Binh luan duoc chon
+   * @returns void
+   */
   const handleLongPress = (comment: Comment) => {
     // open bottom sheet instead of alert
     showSheet(comment);
   };
 
+  /**
+   * Build danh sach hien thi (root + replies mo rong).
+   * @returns Danh sach item
+   */
   const buildData = (): ListItem[] =>
     rootComments.flatMap((root) => {
       const items: ListItem[] = [root];

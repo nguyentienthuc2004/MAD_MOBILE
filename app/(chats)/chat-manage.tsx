@@ -15,6 +15,10 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { chatService } from "../../services/chat.service";
 
+/**
+ * Man hinh quan ly phong chat/nhom.
+ * @returns JSX Element
+ */
 export default function ChatManageScreen() {
 
     const router = useRouter();
@@ -52,6 +56,10 @@ export default function ChatManageScreen() {
         });
     }, [roomId]);
 
+    /**
+     * Tim kiem tin nhan trong doan chat.
+     * @returns void
+     */
     const handleSearchMessages = () => {
         if (!searchKeyword.trim()) {
             Alert.alert("Thông báo", "Nhập nội dung muốn tìm kiếm");
@@ -65,11 +73,21 @@ export default function ChatManageScreen() {
         setShowSearchModal(false);
     };
 
+    /**
+     * Bat/tat thong bao doan chat (local).
+     * @param value Trang thai
+     * @returns void
+     */
     const handleToggleNotification = (value: boolean) => {
         setNotificationEnabled(value);
         // TODO: Gửi trạng thái bật/tắt thông báo cho backend hoặc lưu local
     };
 
+    /**
+     * Xoa doan chat.
+     * @returns Promise<void>
+     * @sideEffect Goi API delete room va dieu huong.
+     */
     const handleDeleteChat = async () => {
         if (!roomId) return;
         Alert.alert(
@@ -94,6 +112,11 @@ export default function ChatManageScreen() {
         );
     };
 
+    /**
+     * Roi khoi nhom chat.
+     * @returns Promise<void>
+     * @sideEffect Goi API leave group va dieu huong.
+     */
     const handleLeaveGroup = async () => {
         if (!roomId) return;
 
@@ -127,6 +150,10 @@ export default function ChatManageScreen() {
         );
     };
 
+    /**
+     * Hien thi xac nhan chan nguoi dung.
+     * @returns void
+     */
     const handleBlock = () => {
         Alert.alert(
             "Chặn",
@@ -146,7 +173,10 @@ export default function ChatManageScreen() {
         );
     };
 
-    // Hàm chọn ảnh từ thư viện
+    /**
+     * Chon anh tu thu vien cho avatar nhom.
+     * @returns Promise<void>
+     */
     const handlePickAvatar = async () => {
         try {
             const result = await ImagePicker.launchImageLibraryAsync({
@@ -163,7 +193,11 @@ export default function ChatManageScreen() {
         }
     };
 
-    // Hàm upload avatar (dùng uri ảnh đã chọn hoặc link nhập tay)
+    /**
+     * Luu avatar nhom.
+     * @returns Promise<void>
+     * @sideEffect Goi API update room avatar.
+     */
     const handleSaveAvatar = async () => {
         if (!roomId || !pickedAvatarUri) {
             console.log("Không có roomId hoặc pickedAvatarUri", { roomId, pickedAvatarUri });

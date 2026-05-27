@@ -6,12 +6,20 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { userService, type AppUser } from "@/services/user.service";
 
+/**
+ * Man hinh bat dau doan chat moi.
+ * @returns JSX Element
+ */
 export default function NewChatScreen() {
     const router = useRouter();
     const [keyword, setKeyword] = useState("");
     const [users, setUsers] = useState<AppUser[]>([]);
 
     useEffect(() => {
+        /**
+         * Lay danh sach nguoi dung.
+         * @returns Promise<void>
+         */
         const fetchUsers = async () => {
             try {
                 const res = await userService.getUsers();

@@ -24,6 +24,10 @@ type Member = {
     role: "owner" | "co_owner" | "member";
 };
 
+/**
+ * Man hinh them thanh vien vao nhom chat.
+ * @returns JSX Element
+ */
 export default function AddMembersScreen() {
     const router = useRouter();
     const { roomId } = useLocalSearchParams<{ roomId: string }>();
@@ -42,6 +46,11 @@ export default function AddMembersScreen() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [roomId]);
 
+    /**
+     * Tai danh sach thanh vien va nguoi dung.
+     * @returns Promise<void>
+     * @sideEffect Goi API members va users.
+     */
     const bootstrap = async () => {
         if (!roomId) return;
         setLoading(true);
@@ -91,12 +100,22 @@ export default function AddMembersScreen() {
 
     const selectedIdSet = useMemo(() => new Set(selectedIds), [selectedIds]);
 
+    /**
+     * Toggle chon nguoi dung.
+     * @param id ID nguoi dung
+     * @returns void
+     */
     const toggleSelect = (id: string) => {
         setSelectedIds((prev) =>
             prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
         );
     };
 
+    /**
+     * Gui danh sach them thanh vien.
+     * @returns Promise<void>
+     * @sideEffect Goi API add members va dieu huong.
+     */
     const handleSubmit = async () => {
         if (!roomId) return;
         if (!selectedIds.length) {
@@ -133,6 +152,11 @@ export default function AddMembersScreen() {
         }
     };
 
+    /**
+     * Render item thanh vien hien tai.
+     * @param item Thanh vien
+     * @returns JSX Element
+     */
     const renderMember = ({ item }: { item: Member }) => {
         return (
             <View style={styles.memberRow}>
@@ -147,6 +171,11 @@ export default function AddMembersScreen() {
         );
     };
 
+    /**
+     * Render item nguoi dung co the them.
+     * @param item Nguoi dung
+     * @returns JSX Element
+     */
     const renderUser = ({ item }: { item: AppUser }) => {
         const id = String(item._id);
         const selected = selectedIdSet.has(id);

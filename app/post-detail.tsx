@@ -24,6 +24,10 @@ const FALLBACK_POST_IMAGE = "https://placehold.co/1080x1080?text=Post";
 const FALLBACK_AVATAR_URL = "https://placehold.co/200x200?text=User";
 type FeedPostItem = FeedPost & { isOwnPost: boolean };
 
+/**
+ * Man hinh chi tiet bai viet (theo danh sach bai viet cua user).
+ * @returns JSX Element
+ */
 export default function PostDetailScreen() {
   const router = useRouter();
   const { postId, authorId, userId, displayName, avatarUrl } =
@@ -73,6 +77,11 @@ export default function PostDetailScreen() {
     },
   );
 
+  /**
+   * Tai danh sach bai viet cua nguoi dung.
+   * @returns Promise<void>
+   * @sideEffect Goi API posts, users, music.
+   */
   const fetchPosts = useCallback(async () => {
     const meId = user?._id;
 
@@ -177,6 +186,10 @@ export default function PostDetailScreen() {
     void fetchPosts();
   }, [fetchPosts]);
 
+  /**
+   * Lam moi danh sach bai viet.
+   * @returns Promise<void>
+   */
   const handleRefresh = useCallback(async () => {
     try {
       setRefreshing(true);
@@ -261,6 +274,11 @@ export default function PostDetailScreen() {
     return () => clearTimeout(timer);
   }, [feedPosts, selectedIndex]);
 
+  /**
+   * Xu ly truong hop scrollToIndex that bai.
+   * @param index Vi tri can scroll
+   * @returns void
+   */
   const handleScrollToIndexFailed = useCallback(
     ({ index }: { index: number }) => {
       const safeIndex = Math.max(0, Math.min(index, feedPosts.length - 1));
@@ -275,6 +293,11 @@ export default function PostDetailScreen() {
     [feedPosts.length],
   );
 
+  /**
+   * Mo man hinh binh luan.
+   * @param post Bai viet
+   * @returns void
+   */
   const handleOpenComments = useCallback(
     (post: FeedPostItem) => {
       void router.push({
@@ -288,6 +311,11 @@ export default function PostDetailScreen() {
     [router],
   );
 
+  /**
+   * Mo luong chinh sua bai viet.
+   * @param post Bai viet
+   * @returns void
+   */
   const handleEditPost = useCallback(
     (post: FeedPostItem) => {
       const sourcePost = postById.get(post.id);
@@ -311,6 +339,12 @@ export default function PostDetailScreen() {
     [postById, router],
   );
 
+  /**
+   * Xoa bai viet.
+   * @param post Bai viet
+   * @returns void
+   * @sideEffect Goi API delete post.
+   */
   const handleDeletePost = useCallback((post: FeedPostItem) => {
     Alert.alert("Xóa bài viết", "Bạn có chắc muốn xóa bài viết này không?", [
       { text: "Hủy", style: "cancel" },
@@ -335,6 +369,11 @@ export default function PostDetailScreen() {
     ]);
   }, []);
 
+  /**
+   * Mo trang ca nhan tac gia.
+   * @param post Bai viet
+   * @returns void
+   */
   const handleOpenUserProfile = useCallback(
     (post: FeedPostItem) => {
       const targetProfileUserId = post.authorId;
@@ -356,6 +395,12 @@ export default function PostDetailScreen() {
     [router, user?._id],
   );
 
+  /**
+   * Danh dau da xem bai viet.
+   * @param post Bai viet
+   * @returns Promise<void>
+   * @sideEffect Goi API viewPost.
+   */
   const handleRecordPostView = useCallback(
     async (post: FeedPostItem) => {
       if (!user?._id || !post.id || viewedPostIdsRef.current.has(post.id)) {

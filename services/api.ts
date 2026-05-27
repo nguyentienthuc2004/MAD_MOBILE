@@ -33,11 +33,21 @@ export type ApiResponse<T> = {
   data: T;
 };
 
+/**
+ * Loi API da duoc chuan hoa de UI xu ly nhat quan.
+ */
 export class ApiError extends Error {
   status: number;
   code?: string;
   details?: unknown;
 
+  /**
+   * Tao doi tuong loi API.
+   * @param message Thong diep loi
+   * @param status Ma trang thai HTTP
+   * @param code Ma loi tu backend (neu co)
+   * @param details Du lieu chi tiet loi
+   */
   constructor(
     message: string,
     status: number,
@@ -55,7 +65,12 @@ export class ApiError extends Error {
 let apiAuthConfig: ApiAuthConfig | null = null;
 let refreshPromise: Promise<string | null> | null = null;
 
-//store dang ky cach lay token va xu ly mat phien
+/**
+ * Dang ky cach lay token va xu ly mat phien.
+ * @param config Cau hinh auth (get/refresh token, xu ly that bai)
+ * @returns void
+ * @sideEffect Luu cau hinh auth dung chung cho toan app.
+ */
 export const configureApiAuth = (config: ApiAuthConfig) => {
   apiAuthConfig = config;
 };
@@ -68,10 +83,17 @@ const DEFAULT_API_URL = Platform.select({
 const configuredApiUrl =
   process.env.EXPO_PUBLIC_API_URL ?? process.env.API_BASE_URL ?? "";
 
-//xoa dau / cuoi base url
+/**
+ * Chuan hoa base URL, loai bo dau "/" o cuoi.
+ * @param url Base URL thoi
+ * @returns Base URL da chuan hoa
+ */
 const normalizeApiBaseUrl = (url: string) => url.trim().replace(/\/+$/, "");
 
-//doi localhost thanh 10.0.2.2 tren android emulator
+/**
+ * Giai quyet base URL theo moi truong (android emulator, env).
+ * @returns Base URL phu hop hien tai
+ */
 const resolveApiBaseUrl = () => {
   let base = configuredApiUrl.trim() || DEFAULT_API_URL;
 
@@ -86,12 +108,20 @@ const resolveApiBaseUrl = () => {
 
 export const API_BASE_URL = resolveApiBaseUrl();
 
+/**
+ * Xay dung URL day du tu path.
+ * @param path Duong dan API
+ * @returns URL day du
+ */
 const buildUrl = (path: string) => {
   if (/^https?:\/\//.test(path)) return path;
   return `${API_BASE_URL}${path.startsWith("/") ? path : `/${path}`}`;
 };
 console.log("API_BASE_URL =", API_BASE_URL);
-//tao axios client mac dinh
+/**
+ * Tao axios client mac dinh.
+ * @returns AxiosInstance
+ */
 const createClient = (): AxiosInstance =>
   axios.create({
     baseURL: API_BASE_URL,
@@ -105,7 +135,11 @@ const createClient = (): AxiosInstance =>
 const publicClient = createClient();
 const authClient = createClient();
 
-//chuan hoa loi ve apierror de ui xu ly dong nhat
+/**
+ * Chuan hoa loi ve ApiError de UI xu ly dong nhat.
+ * @param error Loi bat duoc
+ * @returns ApiError da chuan hoa
+ */
 const toApiError = (error: unknown): ApiError => {
   if (error instanceof ApiError) {
     return error;
@@ -147,7 +181,11 @@ const toApiError = (error: unknown): ApiError => {
   );
 };
 
-//gan access token vao request can auth
+/**
+ * Interceptor gan access token vao request can auth.
+ * @param config Cau hinh request
+ * @returns Cau hinh request da gan token
+ */
 authClient.interceptors.request.use((config) => {
   const accessToken = apiAuthConfig?.getAccessToken();
   if (accessToken) {
@@ -159,7 +197,12 @@ authClient.interceptors.request.use((config) => {
   return config;
 });
 
-//bat 401 refresh token 1 lan roi gui lai request cu
+/**
+ * Interceptor xu ly 401: refresh token mot lan va thu lai request.
+ * @param response Response thanh cong
+ * @param error Loi tu axios
+ * @returns Response hoac throw ApiError
+ */
 authClient.interceptors.response.use(
   (response) => response,
   async (error: unknown) => {
@@ -216,7 +259,14 @@ authClient.interceptors.response.use(
   },
 );
 
-//ham request dung chung cho public va auth client
+/**
+ * Ham request dung chung cho public va auth client.
+ * @param client Axios client
+ * @param path Duong dan API
+ * @param options Tuy chon request
+ * @returns Du lieu tu API
+ * @sideEffect Ghi log request/response
+ */
 const requestWithClient = async <T>(
   client: AxiosInstance,
   path: string,
@@ -253,11 +303,21 @@ const requestWithClient = async <T>(
   }
 };
 
-//request cho api public
+/**
+ * Request cho API public (khong can token).
+ * @param path Duong dan API
+ * @param options Tuy chon request
+ * @returns Du lieu tu API
+ */
 export const apiRequest = <T>(path: string, options: ApiRequestOptions = {}) =>
   requestWithClient<T>(publicClient, path, options);
 
-//request cho api can token
+/**
+ * Request cho API can token.
+ * @param path Duong dan API
+ * @param options Tuy chon request
+ * @returns Du lieu tu API
+ */
 export const apiAuthRequest = <T>(
   path: string,
   options: ApiRequestOptions = {},

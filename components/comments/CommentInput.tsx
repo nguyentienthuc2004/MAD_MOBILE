@@ -22,6 +22,17 @@ type Props = {
   onCommentEdited?: (c: Comment) => void;
 };
 
+/**
+ * O nhap binh luan, ho tro reply va edit.
+ * @param postId ID bai viet
+ * @param replyTarget Binh luan dang reply
+ * @param editTarget Binh luan dang edit
+ * @param onCancelReply Huy reply
+ * @param onCancelEdit Huy edit
+ * @param onCommentAdded Callback sau khi them
+ * @param onCommentEdited Callback sau khi sua
+ * @returns JSX Element
+ */
 export default function CommentInput({
   postId,
   replyTarget,
@@ -40,6 +51,11 @@ export default function CommentInput({
     }
   }, [editTarget]);
 
+  /**
+   * Gui binh luan moi hoac cap nhat binh luan.
+   * @returns void
+   * @sideEffect Goi API comment va cap nhat UI.
+   */
   const onSend = async () => {
     if (!text.trim()) return;
     try {

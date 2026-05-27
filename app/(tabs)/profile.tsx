@@ -23,6 +23,10 @@ import { SafeAreaView } from "react-native-safe-area-context";
 const GRID_GAP = 2;
 const FALLBACK_POST_IMAGE = "https://placehold.co/1080x1080?text=Post";
 
+/**
+ * Man hinh trang ca nhan.
+ * @returns JSX Element
+ */
 const ProfileScreen = () => {
   const router = useRouter();
   const { width: screenWidth } = useWindowDimensions();
@@ -42,6 +46,11 @@ const ProfileScreen = () => {
   >({});
   const logout = useAuth((state) => state.logout);
 
+  /**
+   * Lay danh sach bai viet cua user.
+   * @returns Promise<void>
+   * @sideEffect Goi API posts by user va cap nhat state.
+   */
   const fetchPosts = useCallback(async () => {
     const userId = user?._id;
     if (!userId) {
@@ -54,6 +63,11 @@ const ProfileScreen = () => {
     setRevealedSensitiveByPostId({});
   }, [request, user?._id]);
 
+  /**
+   * Lay danh sach bai viet da thich.
+   * @returns Promise<void>
+   * @sideEffect Goi API liked posts va cap nhat state.
+   */
   const fetchLikedPosts = useCallback(async () => {
     const userId = user?._id;
     if (!userId) {
@@ -71,6 +85,11 @@ const ProfileScreen = () => {
     else void fetchLikedPosts();
   }, [tab, fetchPosts, fetchLikedPosts]);
 
+  /**
+   * Lam moi thong tin user va bai viet.
+   * @returns Promise<void>
+   * @sideEffect Goi API refetchMe va reload posts.
+   */
   const handleRefresh = useCallback(async () => {
     try {
       setRefreshing(true);
@@ -105,7 +124,12 @@ const ProfileScreen = () => {
     user?.username,
   ]);
 
-  // Mở post, truyền đúng authorId nếu là tab liked
+  /**
+   * Mo chi tiet bai viet, co the truyen tac gia.
+   * @param postId ID bai viet
+   * @param authorId ID tac gia
+   * @returns void
+   */
   const handleOpenPost = (postId: string, authorId?: string) => {
     void router.push({
       pathname: "/post-detail",
@@ -116,6 +140,11 @@ const ProfileScreen = () => {
     });
   };
 
+  /**
+   * Xu ly bam vao item trong luoi bai viet.
+   * @param item Bai viet
+   * @returns void
+   */
   const handlePressGridPost = (item: FeedPost) => {
     const isBlocked =
       Boolean(item.isSensitive) && !revealedSensitiveByPostId[item.id];
@@ -148,6 +177,10 @@ const ProfileScreen = () => {
     );
   };
 
+  /**
+   * Mo danh sach followers.
+   * @returns void
+   */
   const handleOpenFollowers = () => {
     router.push({
       pathname: "/followers",
@@ -161,6 +194,10 @@ const ProfileScreen = () => {
     } as any);
   };
 
+  /**
+   * Mo danh sach following.
+   * @returns void
+   */
   const handleOpenFollowing = () => {
     router.push({
       pathname: "/followers",

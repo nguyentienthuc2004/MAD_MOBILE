@@ -11,14 +11,28 @@ import {
 } from "react-native";
 import { authService } from "../../services/auth.service";
 
+/**
+ * Man hinh gui OTP quen mat khau.
+ * @returns JSX Element
+ */
 export default function ForgotPasswordScreen() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  /**
+   * Kiem tra dinh dang email.
+   * @param value Email
+   * @returns boolean
+   */
   const isValidEmail = (value: string) => /\S+@\S+\.\S+/.test(value);
 
+  /**
+   * Gui OTP ve email.
+   * @returns Promise<void>
+   * @sideEffect Goi API forgot password va dieu huong.
+   */
   const handleSend = async () => {
     const value = email.trim();
     if (!value || !isValidEmail(value)) {

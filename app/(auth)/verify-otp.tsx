@@ -11,6 +11,10 @@ import {
 } from "react-native";
 import { authService } from "../../services/auth.service";
 
+/**
+ * Man hinh xac thuc OTP.
+ * @returns JSX Element
+ */
 export default function VerifyOtpScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
@@ -32,6 +36,12 @@ export default function VerifyOtpScreen() {
 
   const value = digits.join("");
 
+  /**
+   * Xu ly nhap tung ky tu OTP.
+   * @param index Vi tri o nhap
+   * @param text Gia tri nhap
+   * @returns void
+   */
   const handleChange = (index: number, text: string) => {
     if (error) setError(null);
     const ch = text.replace(/[^0-9]/g, "").slice(-1);
@@ -46,6 +56,11 @@ export default function VerifyOtpScreen() {
     }
   };
 
+  /**
+   * Xac thuc OTP va lay reset token.
+   * @returns Promise<void>
+   * @sideEffect Goi API verify otp va dieu huong.
+   */
   const handleVerify = async () => {
     if (value.length !== 6) {
       setError("OTP phải có 6 chữ số");
@@ -71,6 +86,11 @@ export default function VerifyOtpScreen() {
     }
   };
 
+  /**
+   * Gui lai OTP khi het thoi gian dem nguoc.
+   * @returns Promise<void>
+   * @sideEffect Goi API forgot password va reset timer.
+   */
   const handleResend = async () => {
     if (seconds > 0) return;
     setLoading(true);

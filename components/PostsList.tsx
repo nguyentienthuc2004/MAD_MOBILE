@@ -23,6 +23,23 @@ type PostsListProps = {
   onPostVisible?: (post: Post) => void | Promise<void>;
 };
 
+/**
+ * Danh sach bai viet dang feed (FlatList).
+ * @param posts Danh sach post
+ * @param listHeaderComponent Header component tuy chon
+ * @param refreshing Trang thai refresh
+ * @param onRefresh Callback refresh
+ * @param sensitiveResetKey Khoa reset che do noi dung nhay cam
+ * @param canFollow Cho phep follow
+ * @param getIsFollowing Ham kiem tra follow
+ * @param onToggleFollow Callback theo doi
+ * @param onPressUser Callback mo trang user
+ * @param onPressPost Callback mo chi tiet post
+ * @param onPressMessage Callback nhan tin
+ * @param onPressComment Callback mo binh luan
+ * @param onPostVisible Callback khi post duoc nhin thay
+ * @returns JSX Element
+ */
 export default function PostsList({
   posts,
   listHeaderComponent,
@@ -53,6 +70,9 @@ export default function PostsList({
     itemVisiblePercentThreshold: 70,
   });
 
+  /**
+   * Xu ly khi post duoc view de cap nhat active va thong bao view.
+   */
   const onViewableItemsChanged = useRef(
     ({ viewableItems }: { viewableItems: ViewToken<Post>[] }) => {
       const firstVisiblePost = viewableItems.find(

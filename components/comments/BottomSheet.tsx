@@ -22,6 +22,13 @@ type Props = {
   options: Option[];
 };
 
+/**
+ * Bottom sheet don gian de hien thi danh sach hanh dong.
+ * @param visible Trang thai hien thi
+ * @param onClose Callback dong sheet
+ * @param options Danh sach hanh dong
+ * @returns JSX Element
+ */
 const BottomSheet: React.FC<Props> = ({ visible, onClose, options }) => {
   const anim = useRef(new Animated.Value(0)).current;
   const insets = useSafeAreaInsets();

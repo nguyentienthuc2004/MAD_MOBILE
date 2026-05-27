@@ -27,12 +27,22 @@ const DOWNLOAD_ALBUM_TITLE_REGEX = /downloads?|tai xuong|tai ve/i;
 const TRASH_PATH_REGEX = /(?:^|[\\/])(?:\.trashed?|\.trash(?:es)?|trash|recycle(?:\s*bin)?|thung\s*rac)(?:[\\/]|$)/i;
 const IMAGE_FILE_EXT_REGEX = /\.(avif|bmp|gif|heic|heif|jfif|jpe?g|png|webp)$/i;
 
+/**
+ * Chuan hoa ten album de so khop.
+ * @param title Ten album
+ * @returns Chuoi da chuan hoa
+ */
 const normalizeAlbumTitle = (title: string) =>
   title
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase();
 
+/**
+ * Kiem tra asset co kha nang la anh.
+ * @param asset Media asset
+ * @returns boolean
+ */
 const isLikelyImageAsset = (asset: MediaLibrary.Asset) => {
   if (asset.mediaType === MediaLibrary.MediaType.photo) {
     return true;
@@ -42,6 +52,11 @@ const isLikelyImageAsset = (asset: MediaLibrary.Asset) => {
   return IMAGE_FILE_EXT_REGEX.test(source);
 };
 
+/**
+ * Chuan hoa uri de kiem tra.
+ * @param uri Duong dan
+ * @returns Chuoi da chuan hoa
+ */
 const normalizeUriForCheck = (uri?: string | null) => {
   if (!uri) {
     return "";
@@ -54,6 +69,11 @@ const normalizeUriForCheck = (uri?: string | null) => {
   }
 };
 
+/**
+ * Kiem tra uri co nam trong thung rac.
+ * @param uri Duong dan
+ * @returns boolean
+ */
 const isTrashUri = (uri?: string | null) => {
   const normalized = normalizeUriForCheck(uri);
   if (!normalized) {
@@ -63,6 +83,11 @@ const isTrashUri = (uri?: string | null) => {
   return TRASH_PATH_REGEX.test(normalized);
 };
 
+/**
+ * Kiem tra uri co the doc/preview duoc.
+ * @param uri Duong dan
+ * @returns Promise<boolean>
+ */
 const canLoadImageUri = (uri: string) =>
   new Promise<boolean>((resolve) => {
     try {
@@ -76,6 +101,12 @@ const canLoadImageUri = (uri: string) =>
     }
   });
 
+/**
+ * So sanh 2 mang string theo thu tu.
+ * @param left Mang 1
+ * @param right Mang 2
+ * @returns boolean
+ */
 const areStringArraysEqual = (left: string[], right: string[]) => {
   if (left.length !== right.length) {
     return false;
@@ -84,6 +115,10 @@ const areStringArraysEqual = (left: string[], right: string[]) => {
   return left.every((value, index) => value === right[index]);
 };
 
+/**
+ * Man hinh chon anh de tao bai viet.
+ * @returns JSX Element
+ */
 export default function CreatePostImageScreen() {
   const router = useRouter();
   const loadRequestIdRef = useRef(0);
@@ -150,6 +185,10 @@ export default function CreatePostImageScreen() {
     return "Chế độ chọn 1 ảnh";
   }, [hasPermission, isMultiSelectEnabled, selectedAssetIds.length]);
 
+  /**
+   * Mo ImagePicker he thong.
+   * @returns Promise<void>
+   */
   const openSystemImagePicker = useCallback(async () => {
     try {
       const pickerResult = await ImagePicker.launchImageLibraryAsync({
@@ -176,6 +215,11 @@ export default function CreatePostImageScreen() {
     }
   }, []);
 
+  /**
+   * Lay toan bo asset anh tu album.
+   * @param albumId ID album
+   * @returns Promise<MediaLibrary.Asset[]>
+   */
   const fetchAllPhotoAssets = useCallback(async (albumId?: string) => {
     let hasNextPage = true;
     let after: string | undefined;
@@ -204,6 +248,11 @@ export default function CreatePostImageScreen() {
       .sort((a, b) => (b.creationTime ?? 0) - (a.creationTime ?? 0));
   }, []);
 
+  /**
+   * Resolve localUri cho asset tu thu muc tai ve.
+   * @param items Danh sach asset
+   * @returns Promise<MediaLibrary.Asset[]>
+   */
   const hydrateLiveDownloadAssets = useCallback(
     async (items: MediaLibrary.Asset[]) => {
       const resolved = await Promise.all(
@@ -242,6 +291,10 @@ export default function CreatePostImageScreen() {
     [],
   );
 
+  /**
+   * Lay anh gan day trong thu muc tai ve.
+   * @returns Promise<MediaLibrary.Asset[]>
+   */
   const fetchRecentAssets = useCallback(async () => {
     const albums = await MediaLibrary.getAlbumsAsync();
     const preferredAlbums = albums.filter((album) =>
@@ -263,6 +316,10 @@ export default function CreatePostImageScreen() {
     return hydrateLiveDownloadAssets(mergedAssets);
   }, [fetchAllPhotoAssets, hydrateLiveDownloadAssets]);
 
+  /**
+   * Xin quyen va tai anh gan day.
+   * @returns Promise<void>
+   */
   const requestPermissionAndLoadAssets = useCallback(async () => {
     const requestId = loadRequestIdRef.current + 1;
     loadRequestIdRef.current = requestId;
@@ -316,6 +373,11 @@ export default function CreatePostImageScreen() {
     }
   }, [fetchRecentAssets]);
 
+  /**
+   * Chon/bo chon anh.
+   * @param assetId ID asset
+   * @returns void
+   */
   const handleSelectAsset = useCallback(
     (assetId: string) => {
       setFallbackSelectedUris([]);
@@ -384,6 +446,10 @@ export default function CreatePostImageScreen() {
     setSelectedAssetIds([assets[0].id]);
   }, [assets, fallbackSelectedUris.length, selectedAssetIds.length]);
 
+  /**
+   * Lam moi danh sach anh.
+   * @returns Promise<void>
+   */
   const handleRefresh = useCallback(async () => {
     try {
       setRefreshing(true);
@@ -393,6 +459,10 @@ export default function CreatePostImageScreen() {
     }
   }, [requestPermissionAndLoadAssets]);
 
+  /**
+   * Bat/tat che do chon nhieu.
+   * @returns void
+   */
   const toggleMultiSelect = useCallback(() => {
     setIsMultiSelectEnabled((prev) => !prev);
   }, []);

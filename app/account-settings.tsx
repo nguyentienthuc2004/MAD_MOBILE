@@ -5,11 +5,20 @@ import React from "react";
 import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+/**
+ * Man hinh cai dat tai khoan.
+ * @returns JSX Element
+ */
 export default function AccountSettings() {
   const router = useRouter();
   const logout = useAuth((s) => s.logout);
   const logoutAll = useAuth((s) => s.logoutAll);
 
+  /**
+   * Dang xuat tai khoan hien tai.
+   * @returns void
+   * @sideEffect Goi action logout.
+   */
   const handleLogout = async () => {
     try {
       await logout();
@@ -18,6 +27,11 @@ export default function AccountSettings() {
     }
   };
 
+  /**
+   * Dang xuat tat ca thiet bi (co xac nhan).
+   * @returns void
+   * @sideEffect Goi action logoutAll.
+   */
   const handleLogoutAll = () => {
     Alert.alert(
       "Đăng xuất tất cả thiết bị",

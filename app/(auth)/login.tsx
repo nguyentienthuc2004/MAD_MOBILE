@@ -12,6 +12,10 @@ import {
   View,
 } from "react-native";
 
+/**
+ * Man hinh dang nhap.
+ * @returns JSX Element
+ */
 export default function LoginScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -21,8 +25,18 @@ export default function LoginScreen() {
   const error = useAuth((state) => state.error);
   const clearError = useAuth((state) => state.clearError);
 
+  /**
+   * Kiem tra dinh dang email.
+   * @param value Email
+   * @returns boolean
+   */
   const isValidEmail = (value: string) => /\S+@\S+\.\S+/.test(value);
 
+  /**
+   * Xu ly dang nhap.
+   * @returns Promise<void>
+   * @sideEffect Goi auth store login.
+   */
   const handleLogin = async () => {
     if (!email.trim() || !password) {
       setValidationError("Vui lòng nhập email và mật khẩu");

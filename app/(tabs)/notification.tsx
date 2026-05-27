@@ -12,6 +12,10 @@ import {
   View,
 } from "react-native";
 
+/**
+ * Man hinh thong bao.
+ * @returns JSX Element
+ */
 const NotificationScreen: React.FC = () => {
   const unread = useNotifications((s) => s.unreadCount);
   const markAll = useNotifications((s) => s.markAllRead);

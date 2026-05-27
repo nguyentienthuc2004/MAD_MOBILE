@@ -6,6 +6,10 @@ import { useEffect, useState } from "react";
 import { FlatList, Image, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
+/**
+ * Man hinh tim kiem tin nhan trong phong.
+ * @returns JSX Element
+ */
 export default function SearchMessagesScreen() {
     const router = useRouter();
     const { roomId } = useLocalSearchParams<{ roomId: string }>();
@@ -24,6 +28,11 @@ export default function SearchMessagesScreen() {
         });
     }, [roomId]);
 
+    /**
+     * Tim tin nhan theo tu khoa.
+     * @returns Promise<void>
+     * @sideEffect Goi API messages voi keyword.
+     */
     const handleSearch = async () => {
         if (!keyword.trim() || !roomId) return;
         setLoading(true);
@@ -193,6 +202,13 @@ const styles = StyleSheet.create({
     },
 });
 
+/**
+ * Highlight tu khoa trong doan van.
+ * @param text Van ban goc
+ * @param keyword Tu khoa
+ * @param highlightStyle Style highlight
+ * @returns JSX Element[]
+ */
 function highlightText(text: string, keyword: string, highlightStyle: any) {
     if (!keyword) return <Text>{text}</Text>;
     const regex = new RegExp(`(${keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`, "gi");

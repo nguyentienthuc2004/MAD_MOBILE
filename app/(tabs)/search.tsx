@@ -29,6 +29,10 @@ const GRID_GAP = 2;
 const FALLBACK_AVATAR = "https://placehold.co/100x100/e2e8f0/64748b?text=U";
 const FALLBACK_POST_IMAGE = "https://placehold.co/400x400/e2e8f0/64748b?text=P";
 
+/**
+ * Man hinh tim kiem nguoi dung va bai viet.
+ * @returns JSX Element
+ */
 const SearchScreen = () => {
   const router = useRouter();
   const { width: screenWidth } = useWindowDimensions();
@@ -119,6 +123,13 @@ const SearchScreen = () => {
     return () => clearTimeout(timer);
   }, [query]);
 
+  /**
+   * Theo doi/bo theo doi nguoi dung trong ket qua tim kiem.
+   * @param userId ID nguoi dung
+   * @param currentlyFollowing Trang thai hien tai
+   * @returns Promise<void>
+   * @sideEffect Goi API follow/unfollow va cap nhat state.
+   */
   const handleToggleFollow = useCallback(
     async (userId: string, currentlyFollowing: boolean) => {
       if (followLoadingIds.has(userId)) return;
@@ -149,11 +160,21 @@ const SearchScreen = () => {
     [followLoadingIds]
   );
 
+  /**
+   * Dieu huong den trang nguoi dung.
+   * @param userId ID nguoi dung
+   * @returns void
+   */
   const handleUserPress = (userId: string) => {
     router.push({ pathname: "/users/[userId]", params: { userId } });
   };
 
   // --- Render user search result item ---
+  /**
+   * Render item nguoi dung trong ket qua tim kiem.
+   * @param item Item nguoi dung
+   * @returns JSX Element
+   */
   const renderUserItem = ({ item }: { item: SearchUser }) => {
     const isSelf = item._id === currentUser?._id;
     const isFollowing = !!item.isFollowing;
@@ -207,6 +228,11 @@ const SearchScreen = () => {
   };
 
   // --- Render explore grid item ---
+  /**
+   * Render item trong luoi kham pha.
+   * @param item Bai viet
+   * @returns JSX Element
+   */
   const renderGridItem = ({
     item,
   }: {
@@ -261,6 +287,11 @@ const SearchScreen = () => {
     );
   };
 
+  /**
+   * Render item luoi bai viet ket qua tim kiem.
+   * @param item Bai viet
+   * @returns JSX Element
+   */
   const renderSearchPostGridItem = ({ item }: { item: SearchPost }) => {
     const imageUri = item.images?.[0] || FALLBACK_POST_IMAGE;
     const isBlocked = Boolean(item.isSensitive) && !revealedSensitiveByPostId[item._id];
@@ -309,6 +340,11 @@ const SearchScreen = () => {
     );
   };
 
+  /**
+   * Lam moi ket qua tim kiem hoac luoi kham pha.
+   * @returns Promise<void>
+   * @sideEffect Goi API search/explore.
+   */
   const handleRefresh = async () => {
     try {
       setRefreshing(true);
@@ -351,6 +387,10 @@ const SearchScreen = () => {
     }
   };
 
+  /**
+   * Render giao dien ket qua tim kiem.
+   * @returns JSX Element
+   */
   const renderSearchResults = () => {
     if (searchLoading) {
       return (

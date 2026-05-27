@@ -51,7 +51,16 @@ export type LoginPayload = {
   password: string;
 };
 
+/**
+ * Cac API xac thuc nguoi dung.
+ */
 export const authService = {
+  /**
+   * Dang ky tai khoan moi.
+   * @param payload Thong tin dang ky
+   * @returns Session (user + tokens)
+   * @sideEffect Goi API public, khong can token.
+   */
   register(payload: RegisterPayload) {
     return apiRequest<ApiResponse<AuthSession>>("/auth/register", {
       method: "POST",
@@ -59,6 +68,12 @@ export const authService = {
     });
   },
 
+  /**
+   * Dang nhap va nhan session.
+   * @param payload Thong tin dang nhap
+   * @returns Session (user + tokens)
+   * @sideEffect Goi API public, khong can token.
+   */
   login(payload: LoginPayload) {
     return apiRequest<ApiResponse<AuthSession>>("/auth/login", {
       method: "POST",
@@ -66,6 +81,12 @@ export const authService = {
     });
   },
 
+  /**
+   * Lam moi access token bang refresh token.
+   * @param refreshToken Refresh token hien tai
+   * @returns Cap token moi
+   * @sideEffect Goi API public, khong can access token.
+   */
   refresh(refreshToken: string) {
     return apiRequest<ApiResponse<AuthTokens>>("/auth/refresh", {
       method: "POST",
@@ -73,6 +94,12 @@ export const authService = {
     });
   },
 
+  /**
+   * Dang xuat thiet bi hien tai.
+   * @param refreshToken Refresh token neu can
+   * @returns Thong diep tu server
+   * @sideEffect Goi API co token, co the bo qua refresh.
+   */
   logout(refreshToken?: string) {
     return apiAuthRequest<ApiResponse<{ message?: string }>>("/auth/logout", {
       method: "POST",
@@ -81,6 +108,11 @@ export const authService = {
     });
   },
 
+  /**
+   * Dang xuat tat ca thiet bi.
+   * @returns Thong diep tu server
+   * @sideEffect Goi API co token, co the bo qua refresh.
+   */
   logoutAll() {
     return apiAuthRequest<ApiResponse<{ message?: string }>>(
       "/auth/logout-all",
@@ -91,12 +123,23 @@ export const authService = {
     );
   },
 
+  /**
+   * Lay thong tin nguoi dung hien tai.
+   * @returns Thong tin user
+   * @sideEffect Can token.
+   */
   me() {
     return apiAuthRequest<ApiResponse<AuthUser>>("/auth/me", {
       method: "GET",
     });
   },
 
+  /**
+   * Gui email khoi phuc mat khau.
+   * @param payload Email can gui OTP
+   * @returns Ket qua gui OTP
+   * @sideEffect Goi API public.
+   */
   forgotPassword(payload: { email: string }) {
     return apiRequest<ApiResponse<null>>("/auth/forgot-password", {
       method: "POST",
@@ -104,6 +147,12 @@ export const authService = {
     });
   },
 
+  /**
+   * Xac thuc OTP de lay reset token.
+   * @param payload Email va OTP
+   * @returns Reset token neu hop le
+   * @sideEffect Goi API public.
+   */
   verifyOtp(payload: { email: string; otp: string }) {
     return apiRequest<ApiResponse<{ resetToken?: string }>>(
       "/auth/verify-otp",
@@ -114,6 +163,12 @@ export const authService = {
     );
   },
 
+  /**
+   * Dat lai mat khau bang reset token.
+   * @param payload Thong tin dat lai mat khau
+   * @returns Thong diep tu server
+   * @sideEffect Goi API public.
+   */
   resetPassword(payload: {
     resetToken: string;
     newPassword: string;

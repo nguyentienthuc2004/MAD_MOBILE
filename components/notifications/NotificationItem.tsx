@@ -7,11 +7,22 @@ type Props = {
   onPress?: (notification: any) => void;
 };
 
+/**
+ * Item thong bao, co menu danh dau chua doc.
+ * @param notification Du lieu thong bao
+ * @param onPress Callback khi bam vao item
+ * @returns JSX Element
+ */
 const NotificationItem: React.FC<Props> = ({ notification, onPress }) => {
   const markRead = useNotifications((s) => s.markRead);
   const markUnread = useNotifications((s) => (s as any).markUnread);
   const [menuVisible, setMenuVisible] = useState(false);
 
+  /**
+   * Mo thong bao va danh dau da doc neu can.
+   * @returns void
+   * @sideEffect Goi action markRead.
+   */
   const handlePress = () => {
     onPress && onPress(notification);
     if (!notification.isRead) {
@@ -19,6 +30,11 @@ const NotificationItem: React.FC<Props> = ({ notification, onPress }) => {
     }
   };
 
+  /**
+   * Danh dau thong bao chua doc.
+   * @returns void
+   * @sideEffect Goi action markUnread.
+   */
   const handleMarkUnread = async () => {
     setMenuVisible(false);
     if (notification.isRead) {

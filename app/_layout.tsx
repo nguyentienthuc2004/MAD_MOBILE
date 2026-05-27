@@ -3,6 +3,10 @@ import { router, Stack, useSegments } from "expo-router";
 import { useEffect } from "react";
 import { ActivityIndicator, View } from "react-native";
 
+/**
+ * Root layout dieu huong theo trang thai dang nhap.
+ * @returns JSX Element
+ */
 export default function RootLayout() {
   const segments = useSegments();
   const isHydrating = useAuth((state) => state.isHydrating);

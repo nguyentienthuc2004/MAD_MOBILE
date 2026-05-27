@@ -17,6 +17,10 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+/**
+ * Man hinh tao nhom chat.
+ * @returns JSX Element
+ */
 export default function CreateGroupScreen() {
     const router = useRouter();
     const { user } = useAuth();
@@ -33,6 +37,10 @@ export default function CreateGroupScreen() {
         void bootstrap();
     }, []);
 
+    /**
+     * Lay danh sach nguoi dung.
+     * @returns Promise<void>
+     */
     const bootstrap = async () => {
         setLoading(true);
         try {
@@ -72,12 +80,22 @@ export default function CreateGroupScreen() {
         return allUsers.filter((u) => selectedIdSet.has(String(u._id)));
     }, [allUsers, selectedIdSet, selectedIds.length]);
 
+    /**
+     * Toggle chon thanh vien.
+     * @param id ID nguoi dung
+     * @returns void
+     */
     const toggleSelect = (id: string) => {
         setSelectedIds((prev) =>
             prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
         );
     };
 
+    /**
+     * Tao nhom chat moi.
+     * @returns Promise<void>
+     * @sideEffect Goi API create group va dieu huong.
+     */
     const handleCreateGroup = async () => {
         const title = groupName.trim();
         if (!title) {

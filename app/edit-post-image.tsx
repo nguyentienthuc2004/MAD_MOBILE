@@ -42,6 +42,11 @@ type SearchParams = {
   selectedUris?: string | string[];
 };
 
+/**
+ * Parse danh sach uri tu params.
+ * @param value Gia tri params
+ * @returns Danh sach uri
+ */
 const parseSelectedUris = (value: string | string[] | undefined): string[] => {
   const rawValue = Array.isArray(value) ? value[0] : value;
 
@@ -64,12 +69,23 @@ const parseSelectedUris = (value: string | string[] | undefined): string[] => {
   }
 };
 
+/**
+ * Tao danh sach selected tu uri co san.
+ * @param uris Danh sach uri
+ * @returns Danh sach selected image
+ */
 const toInitialSelectedImages = (uris: string[]): SelectedImage[] =>
   uris.map((uri, index) => ({
     id: `existing-${index}-${uri}`,
     uri,
   }));
 
+/**
+ * Gop danh sach selected, giu toi da MAX_IMAGES.
+ * @param current Danh sach hien tai
+ * @param incoming Danh sach moi
+ * @returns Danh sach sau khi gop
+ */
 const mergeSelectedImages = (
   current: SelectedImage[],
   incoming: SelectedImage[],
@@ -93,12 +109,22 @@ const mergeSelectedImages = (
   return merged.slice(0, MAX_IMAGES);
 };
 
+/**
+ * Chuan hoa ten album de so khop.
+ * @param title Ten album
+ * @returns Chuoi da chuan hoa
+ */
 const normalizeAlbumTitle = (title: string) =>
   title
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase();
 
+/**
+ * Kiem tra asset co kha nang la anh.
+ * @param asset Media asset
+ * @returns boolean
+ */
 const isLikelyImageAsset = (asset: MediaLibrary.Asset) => {
   if (asset.mediaType === MediaLibrary.MediaType.photo) {
     return true;
@@ -108,6 +134,11 @@ const isLikelyImageAsset = (asset: MediaLibrary.Asset) => {
   return IMAGE_FILE_EXT_REGEX.test(source);
 };
 
+/**
+ * Chuan hoa uri de kiem tra.
+ * @param uri Duong dan
+ * @returns Chuoi da chuan hoa
+ */
 const normalizeUriForCheck = (uri?: string | null) => {
   if (!uri) {
     return "";
@@ -120,6 +151,11 @@ const normalizeUriForCheck = (uri?: string | null) => {
   }
 };
 
+/**
+ * Kiem tra uri co nam trong thung rac.
+ * @param uri Duong dan
+ * @returns boolean
+ */
 const isTrashUri = (uri?: string | null) => {
   const normalized = normalizeUriForCheck(uri);
   if (!normalized) {
@@ -129,6 +165,11 @@ const isTrashUri = (uri?: string | null) => {
   return TRASH_PATH_REGEX.test(normalized);
 };
 
+/**
+ * Kiem tra uri co the doc/preview duoc.
+ * @param uri Duong dan
+ * @returns Promise<boolean>
+ */
 const canLoadImageUri = (uri: string) =>
   new Promise<boolean>((resolve) => {
     try {
@@ -142,8 +183,17 @@ const canLoadImageUri = (uri: string) =>
     }
   });
 
+/**
+ * Kiem tra uri remote.
+ * @param uri Duong dan
+ * @returns boolean
+ */
 const isRemoteUri = (uri: string) => /^https?:\/\//i.test(uri);
 
+/**
+ * Man hinh chon anh de chinh sua bai viet.
+ * @returns JSX Element
+ */
 export default function EditPostImageScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<SearchParams>();
@@ -216,6 +266,10 @@ export default function EditPostImageScreen() {
     return "Chế độ chọn 1 ảnh";
   }, [hasPermission, isMultiSelectEnabled, selectedAssetUris.length]);
 
+  /**
+   * Mo ImagePicker he thong.
+   * @returns Promise<void>
+   */
   const openSystemImagePicker = useCallback(async () => {
     try {
       const pickerResult = await ImagePicker.launchImageLibraryAsync({
@@ -249,6 +303,11 @@ export default function EditPostImageScreen() {
     }
   }, []);
 
+  /**
+   * Lay toan bo asset anh tu album.
+   * @param albumId ID album
+   * @returns Promise<MediaLibrary.Asset[]>
+   */
   const fetchAllPhotoAssets = useCallback(async (albumId?: string) => {
     let hasNextPage = true;
     let after: string | undefined;
@@ -277,6 +336,11 @@ export default function EditPostImageScreen() {
       .sort((a, b) => (b.creationTime ?? 0) - (a.creationTime ?? 0));
   }, []);
 
+  /**
+   * Resolve localUri cho asset tu thu muc tai ve.
+   * @param items Danh sach asset
+   * @returns Promise<MediaLibrary.Asset[]>
+   */
   const hydrateLiveDownloadAssets = useCallback(
     async (items: MediaLibrary.Asset[]) => {
       const resolved = await Promise.all(
@@ -315,6 +379,10 @@ export default function EditPostImageScreen() {
     [],
   );
 
+  /**
+   * Lay anh gan day trong thu muc tai ve.
+   * @returns Promise<MediaLibrary.Asset[]>
+   */
   const fetchRecentAssets = useCallback(async () => {
     const albums = await MediaLibrary.getAlbumsAsync();
     const preferredAlbums = albums.filter((album) =>
@@ -336,6 +404,10 @@ export default function EditPostImageScreen() {
     return hydrateLiveDownloadAssets(mergedAssets);
   }, [fetchAllPhotoAssets, hydrateLiveDownloadAssets]);
 
+  /**
+   * Xin quyen va tai anh gan day.
+   * @returns Promise<void>
+   */
   const requestPermissionAndLoadAssets = useCallback(async () => {
     const requestId = loadRequestIdRef.current + 1;
     loadRequestIdRef.current = requestId;
@@ -390,6 +462,11 @@ export default function EditPostImageScreen() {
     }
   }, [fetchRecentAssets]);
 
+  /**
+   * Chon/bo chon anh.
+   * @param assetId ID asset
+   * @returns void
+   */
   const handleSelectAsset = useCallback(
     (assetId: string) => {
       const asset = assetMap.get(assetId);
@@ -470,6 +547,10 @@ export default function EditPostImageScreen() {
     ]);
   }, [assets, initialSelectedUris.length, selectedImages.length]);
 
+  /**
+   * Lam moi danh sach anh.
+   * @returns Promise<void>
+   */
   const handleRefresh = useCallback(async () => {
     try {
       setRefreshing(true);
@@ -479,6 +560,11 @@ export default function EditPostImageScreen() {
     }
   }, [requestPermissionAndLoadAssets]);
 
+  /**
+   * Xoa anh da chon.
+   * @param image Anh da chon
+   * @returns void
+   */
   const handleDeleteSelectedImage = useCallback((image: SelectedImage) => {
     Alert.alert("Xóa ảnh", "Bạn có chắc muốn xóa ảnh này không?", [
       {
@@ -499,6 +585,10 @@ export default function EditPostImageScreen() {
     ]);
   }, []);
 
+  /**
+   * Bat/tat che do chon nhieu.
+   * @returns void
+   */
   const toggleMultiSelect = useCallback(() => {
     setIsMultiSelectEnabled((prev) => !prev);
   }, []);

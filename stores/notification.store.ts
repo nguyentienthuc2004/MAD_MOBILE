@@ -25,10 +25,18 @@ type NotificationState = {
   markAllRead: () => Promise<void>;
 };
 
+/**
+ * Store quan ly thong bao va unread count.
+ */
 export const useNotifications = create<NotificationState>((set, get) => ({
   notifications: [],
   unreadCount: 0,
   loading: false,
+  /**
+   * Bat realtime thong bao cho user hien tai.
+   * @returns void
+   * @sideEffect Join socket room va dang ky listeners.
+   */
   start: () => {
     const user = useAuth.getState().user;
     if (!user) return;
@@ -74,9 +82,19 @@ export const useNotifications = create<NotificationState>((set, get) => ({
       },
     });
   },
+  /**
+   * Dung realtime thong bao.
+   * @returns void
+   * @sideEffect Huy listeners socket.
+   */
   stop: () => {
     stopNotificationListeners();
   },
+  /**
+   * Tai danh sach thong bao tu backend.
+   * @returns void
+   * @sideEffect Goi API va cap nhat store.
+   */
   refresh: async () => {
     if (get().loading) {
       return;
@@ -99,6 +117,12 @@ export const useNotifications = create<NotificationState>((set, get) => ({
       set({ loading: false });
     }
   },
+  /**
+   * Danh dau mot thong bao da doc.
+   * @param id ID thong bao
+   * @returns void
+   * @sideEffect Goi API, rollback neu that bai.
+   */
   markRead: async (id: string) => {
     const prev = get().notifications.slice();
     const prevCount = get().unreadCount;
@@ -118,6 +142,12 @@ export const useNotifications = create<NotificationState>((set, get) => ({
       set({ notifications: prev, unreadCount: prevCount });
     }
   },
+  /**
+   * Danh dau mot thong bao chua doc.
+   * @param id ID thong bao
+   * @returns void
+   * @sideEffect Goi API, rollback neu that bai.
+   */
   markUnread: async (id: string) => {
     const prev = get().notifications.slice();
     const prevCount = get().unreadCount;
@@ -136,6 +166,11 @@ export const useNotifications = create<NotificationState>((set, get) => ({
       set({ notifications: prev, unreadCount: prevCount });
     }
   },
+  /**
+   * Danh dau tat ca thong bao da doc.
+   * @returns void
+   * @sideEffect Goi API, rollback neu that bai.
+   */
   markAllRead: async () => {
     const prev = get().notifications.slice();
     const prevCount = get().unreadCount;
@@ -168,6 +203,7 @@ const watcherState: NotificationAuthWatcherState = notificationAuthWatcher ?? {
 
 (globalThis as any).__notificationAuthWatcher = watcherState;
 
+// Watcher: bat/tat realtime khi user login/logout
 {
   watcherState.unsubscribe?.();
 
@@ -187,6 +223,7 @@ const watcherState: NotificationAuthWatcherState = notificationAuthWatcher ?? {
   });
 }
 
+// Khoi dong neu app da co user tu truoc
 {
   const initialUser = useAuth.getState().user;
   if (initialUser) {

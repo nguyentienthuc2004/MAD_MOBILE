@@ -26,6 +26,10 @@ const GRID_GAP = 2;
 const FALLBACK_POST_IMAGE = "https://placehold.co/1080x1080?text=Post";
 const FALLBACK_AVATAR_URL = "https://placehold.co/200x200?text=User";
 
+/**
+ * Man hinh trang ca nhan nguoi dung khac.
+ * @returns JSX Element
+ */
 export default function UserProfileScreen() {
   const router = useRouter();
   const { width: screenWidth } = useWindowDimensions();
@@ -59,6 +63,11 @@ export default function UserProfileScreen() {
     Record<string, boolean>
   >({});
 
+  /**
+   * Tai thong tin nguoi dung va bai viet.
+   * @returns Promise<void>
+   * @sideEffect Goi API user + posts.
+   */
   const fetchUserProfile = useCallback(async () => {
     if (!targetUserId) {
       setProfileUser(null);
@@ -124,6 +133,10 @@ export default function UserProfileScreen() {
     check();
   }, [me?._id, targetUserId]);
 
+  /**
+   * Lam moi trang ca nhan.
+   * @returns Promise<void>
+   */
   const handleRefresh = useCallback(async () => {
     try {
       setRefreshing(true);
@@ -161,6 +174,11 @@ export default function UserProfileScreen() {
   const bio = profileUser?.bio || "";
   const avatarUrl = profileUser?.avatarUrl || FALLBACK_AVATAR_URL;
 
+  /**
+   * Mo chi tiet bai viet.
+   * @param postId ID bai viet
+   * @returns void
+   */
   const handleOpenPost = (postId: string) => {
     void router.push({
       pathname: "/post-detail",
@@ -173,6 +191,11 @@ export default function UserProfileScreen() {
     });
   };
 
+  /**
+   * Xu ly bam vao item luoi bai viet.
+   * @param item Bai viet
+   * @returns void
+   */
   const handlePressGridPost = (item: FeedPost) => {
     const isBlocked =
       Boolean(item.isSensitive) && !revealedSensitiveByPostId[item.id];
@@ -201,6 +224,11 @@ export default function UserProfileScreen() {
     );
   };
 
+  /**
+   * Theo doi/bo theo doi nguoi dung.
+   * @returns Promise<void>
+   * @sideEffect Goi API follow/unfollow va cap nhat count.
+   */
   const handleToggleFollow = async () => {
     if (!isAuthenticated || !me?._id) {
       Alert.alert("Thông báo", "Vui lòng đăng nhập để theo dõi.");
@@ -265,6 +293,11 @@ export default function UserProfileScreen() {
     }
   };
 
+  /**
+   * Mo phong chat voi nguoi dung.
+   * @returns Promise<void>
+   * @sideEffect Goi API create room va dieu huong.
+   */
   const handleOpenMessage = async () => {
     if (!targetUserId) {
       return;

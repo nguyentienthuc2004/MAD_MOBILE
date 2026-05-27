@@ -22,6 +22,10 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 const FALLBACK_AVATAR = "https://placehold.co/100x100/e2e8f0/64748b?text=U";
 
+/**
+ * Man hinh chinh sua thong tin ca nhan.
+ * @returns JSX Element
+ */
 export default function EditProfileScreen() {
   const router = useRouter();
   const user = useAuth((s) => s.user);
@@ -56,6 +60,10 @@ export default function EditProfileScreen() {
     }
   }, [user]);
 
+  /**
+   * Chon anh dai dien tu thu vien.
+   * @returns Promise<void>
+   */
   const handlePickAvatar = async () => {
     const permResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permResult.granted) {
@@ -78,6 +86,11 @@ export default function EditProfileScreen() {
     }
   };
 
+  /**
+   * Luu thay doi thong tin ca nhan.
+   * @returns Promise<void>
+   * @sideEffect Upload avatar, update profile, refetch me.
+   */
   const handleSave = async () => {
     setIsSubmitting(true);
     try {

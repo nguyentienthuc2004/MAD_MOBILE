@@ -20,6 +20,10 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import OnlineUsersList from "../../components/OnlineUsersList";
 import { UserAvatar } from "../../components/UserAvatarItem";
 
+/**
+ * Tab danh sach chat va nguoi dang online.
+ * @returns JSX Element
+ */
 export default function ChatTabScreen() {
     const [search, setSearch] = useState("");
     const router = useRouter();
@@ -29,7 +33,11 @@ export default function ChatTabScreen() {
     const [users, setUsers] = useState<any[]>([]);
     const [followIds, setFollowIds] = useState<Set<string>>(new Set());
 
-    // Lấy danh sách user và follow từ API
+    /**
+     * Tai danh sach nguoi dung va quan he follow.
+     * @returns Promise<void>
+     * @sideEffect Goi API users/followers/following, cap nhat state.
+     */
     const fetchUsersAndFollows = useCallback(async () => {
         if (!user?._id) {
             setUsers([]);
@@ -75,6 +83,12 @@ export default function ChatTabScreen() {
         );
     }, [search, onlineUsers]);
 
+    /**
+     * Mo phong chat tu avatar online.
+     * @param selectedUser Nguoi dung duoc chon
+     * @returns Promise<void>
+     * @sideEffect Tao/lay phong chat va dieu huong.
+     */
     const handleOpenUserByAvatar = async (selectedUser: UserAvatar) => {
         if (!selectedUser.id) {
             return;
@@ -103,6 +117,11 @@ export default function ChatTabScreen() {
         }, [refetch]),
     );
 
+    /**
+     * Lam moi danh sach phong va online users.
+     * @returns Promise<void>
+     * @sideEffect Goi API refetch va load follow.
+     */
     const handleRefresh = useCallback(async () => {
         try {
             setRefreshing(true);

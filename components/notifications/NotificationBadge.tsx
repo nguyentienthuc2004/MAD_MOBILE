@@ -6,6 +6,12 @@ type Props = {
   size?: number;
 };
 
+/**
+ * Badge hien thi so thong bao chua doc.
+ * @param count So luong unread
+ * @param size Kich thuoc badge
+ * @returns JSX Element hoac null
+ */
 const NotificationBadge: React.FC<Props> = ({ count, size = 18 }) => {
   if (!count || count <= 0) return null;
   return (

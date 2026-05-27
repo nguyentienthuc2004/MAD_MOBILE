@@ -4,6 +4,10 @@ import React from "react";
 import { FlatList, RefreshControl, StyleSheet, Text, View } from "react-native";
 import NotificationItem from "./NotificationItem";
 
+/**
+ * Danh sach thong bao va dieu huong toi bai viet.
+ * @returns JSX Element
+ */
 const NotificationsList: React.FC = () => {
   const notifications = useNotifications((s) => s.notifications);
   const refresh = useNotifications((s) => s.refresh);
