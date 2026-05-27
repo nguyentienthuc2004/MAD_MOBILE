@@ -1,5 +1,9 @@
 import { Stack } from "expo-router";
 
+/**
+ * Layout cho nhom man hinh xac thuc.
+ * @returns JSX Element
+ */
 export default function AuthLayout() {
   return (
     <Stack screenOptions={{ headerBackButtonDisplayMode: "minimal" }}>

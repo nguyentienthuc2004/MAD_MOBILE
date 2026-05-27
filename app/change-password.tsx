@@ -19,6 +19,10 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 const FALLBACK_AVATAR = "https://placehold.co/100x100/e2e8f0/64748b?text=U";
 
+/**
+ * Man hinh doi mat khau.
+ * @returns JSX Element
+ */
 export default function ChangePasswordScreen() {
   const router = useRouter();
   const user = useAuth((s) => s.user);
@@ -35,6 +39,13 @@ export default function ChangePasswordScreen() {
   const canSubmit =
     currentPassword.length > 0 && isNewPasswordValid && isConfirmMatch;
 
+  /**
+   * Hien thi thong bao tuong thich web/mobile.
+   * @param title Tieu de
+   * @param message Noi dung
+   * @param onOk Callback khi dong
+   * @returns void
+   */
   const showAlert = (title: string, message: string, onOk?: () => void) => {
     if (Platform.OS === "web") {
       window.alert(`${title}\n${message}`);
@@ -44,6 +55,11 @@ export default function ChangePasswordScreen() {
     }
   };
 
+  /**
+   * Luu mat khau moi.
+   * @returns void
+   * @sideEffect Goi API doi mat khau.
+   */
   const handleSave = async () => {
     if (!canSubmit) return;
 
@@ -65,6 +81,10 @@ export default function ChangePasswordScreen() {
     }
   };
 
+  /**
+   * Dieu huong den quen mat khau.
+   * @returns void
+   */
   const handleForgotPassword = () => {
     router.push("/(auth)/forgot-password" as any);
   };

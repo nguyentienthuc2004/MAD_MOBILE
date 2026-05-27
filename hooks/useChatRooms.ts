@@ -5,6 +5,9 @@ import { socket } from "@/socket/socket";
 import { useAuth } from "@/stores/auth.store";
 import { useChatStore } from "@/stores/chat.store";
 
+/**
+ * Mo ta phong chat da duoc map tu API cho UI.
+ */
 export type ChatRoom = {
     id: string;
     name: string;
@@ -16,6 +19,12 @@ export type ChatRoom = {
 
 // Sau này bạn có thể truyền token thật từ useAuth / authStore
 // Hiện tại token được gắn tự động qua configureApiAuth + apiAuthRequest
+/**
+ * Hook tai danh sach phong chat va cap nhat real-time.
+ * @param _token Token truyen vao neu can tuong lai
+ * @returns Danh sach phong, loading, error va ham refetch
+ * @sideEffect Goi API, dang ky socket events, cap nhat store unread.
+ */
 export function useChatRooms(_token?: string) {
     const [rooms, setRooms] = useState<ChatRoom[]>([]);
     const [loading, setLoading] = useState(false);
@@ -24,6 +33,11 @@ export function useChatRooms(_token?: string) {
     const meId = useAuth((state) => state.user?._id ?? null);
 
     const setChatRoomsUnread = useChatStore((s) => s.setRooms);
+    /**
+     * Lay danh sach phong chat tu backend va map cho UI.
+     * @returns Void
+     * @sideEffect Cap nhat state rooms/unread va tham gia socket rooms.
+     */
     const fetchRooms = useCallback(async () => {
         try {
             setLoading(true);
@@ -33,19 +47,19 @@ export function useChatRooms(_token?: string) {
 
             const apiRooms = res.data?.rooms ?? [];
 
-            // Loại bỏ các phòng trùng _id để tránh cảnh báo "Encountered two children with the same key"
+            // Loai bo cac phong trung _id de tranh canh bao key trung trong React
             const uniqueRooms = apiRooms.filter(
                 (room, index, arr) =>
                     index === arr.findIndex((r) => r._id === room._id),
             );
 
-            // Ẩn phòng chat đã bị xoá (theo deletedAt của user),
-            // nhưng nếu có tin nhắn mới hơn deletedAt thì vẫn hiển thị
+            // An phong chat da bi xoa (theo deletedAt cua user),
+            // nhung neu co tin nhan moi hon deletedAt thi van hien thi
             const filteredRooms = uniqueRooms.filter((room) => {
                 const me = room.users?.find((u) => u.user_id === meId);
                 const deletedAt = me?.deletedAt;
                 if (!deletedAt) return true;
-                // Nếu có lastMessage mới hơn deletedAt thì vẫn hiển thị
+                // Neu co lastMessage moi hon deletedAt thi van hien thi
                 if (room.lastMessage?.createdAt) {
                     try {
                         const lastMsgTime = new Date(room.lastMessage.createdAt).getTime();
@@ -53,7 +67,7 @@ export function useChatRooms(_token?: string) {
                         if (lastMsgTime > deletedAtTime) return true;
                     } catch { }
                 }
-                // Ngược lại thì ẩn
+                // Nguoc lai thi an
                 return false;
             });
 
@@ -70,7 +84,7 @@ export function useChatRooms(_token?: string) {
                     : "Chưa có tin nhắn nào";
                 const hasTitle = (room as any).title && (room as any).title.trim();
 
-                // Nếu là phòng friend, ưu tiên avatar & tên của user không phải mình
+                // Neu la phong friend, uu tien avatar & ten cua user khong phai minh
                 if (room.typeRoom === "friend") {
                     const otherMembers = room.users?.filter((u) =>
                         meId ? u.user_id !== meId : true,
@@ -80,7 +94,7 @@ export function useChatRooms(_token?: string) {
                         ? otherMembers[0]
                         : undefined;
 
-                    // Đoạn chat 1-1: luôn ưu tiên hiển thị BIỆT DANH của người còn lại
+                    // Doan chat 1-1: uu tien hien thi biet danh cua nguoi con lai
                     const fallbackName =
                         other?.nickname ||
                         room.users?.map((u) => u.nickname).join(", ") ||
@@ -96,8 +110,8 @@ export function useChatRooms(_token?: string) {
                                 minute: "2-digit",
                             })
                             : "",
-                        // avatar: nếu có title riêng thì dùng avatar room;
-                        // ngược lại dùng avatar của user còn lại
+                        // avatar: neu co title rieng thi dung avatar room;
+                        // nguoc lai dung avatar cua user con lai
                         avatar: hasTitle
                             ? (room as any).avatar || other?.avatar || undefined
                             : other?.avatar || (room as any).avatar || undefined,
@@ -107,7 +121,7 @@ export function useChatRooms(_token?: string) {
                     };
                 }
 
-                // Các loại phòng khác: ưu tiên dùng title + avatar room
+                // Cac loai phong khac: uu tien dung title + avatar room
                 const fallbackName = hasTitle
                     ? (room as any).title
                     : room.users?.map((u) => u.nickname).join(", ") || "Phòng chat";
@@ -132,7 +146,7 @@ export function useChatRooms(_token?: string) {
             setRooms(mapped);
             setChatRoomsUnread(mapped);
 
-            // Tham gia tất cả room qua socket để nhận SERVER_SEND_MESSAGE
+            // Tham gia tat ca room qua socket de nhan SERVER_SEND_MESSAGE
             if (meId) {
                 mapped.forEach((room) => {
                     socket.emit("JOIN_ROOM", { roomId: room.id, userId: meId });
@@ -149,10 +163,15 @@ export function useChatRooms(_token?: string) {
         void fetchRooms();
     }, [fetchRooms]);
 
-    // Cập nhật danh sách phòng theo thời gian thực khi có tin nhắn mới
+    // Cap nhat danh sach phong theo thoi gian thuc khi co tin nhan moi
     useEffect(() => {
         if (!meId) return;
 
+        /**
+         * Xu ly tin nhan den de cap nhat preview va unread.
+         * @param m Payload tin nhan tu socket
+         * @returns void
+         */
         const handleIncomingMessage = (m: MessageDto) => {
             if (!m || !m.room_id) return;
 
@@ -184,30 +203,32 @@ export function useChatRooms(_token?: string) {
                         ...room,
                         lastMessage: lastMessageText,
                         updatedAt: timeText || room.updatedAt,
-                        // Nếu tin nhắn là của mình thì không tăng unread;
-                        // nếu của người khác thì +1 để hiển thị badge
+                        // Neu tin nhan la cua minh thi khong tang unread;
+                        // neu cua nguoi khac thi +1 de hien thi badge
                         unreadCount: isMine
                             ? room.unreadCount
                             : room.unreadCount + 1,
                     };
                 });
 
-                // Đưa room vừa có tin nhắn lên đầu danh sách
+                // Dua room vua co tin nhan len dau danh sach
                 updated.sort((a, b) => {
                     if (a.id === roomId && b.id !== roomId) return -1;
                     if (b.id === roomId && a.id !== roomId) return 1;
                     return 0;
                 });
 
-                // Cập nhật tổng số tin nhắn chưa đọc vào store để badge realtime
+                // Cap nhat tong so tin nhan chua doc vao store de badge realtime
                 setChatRoomsUnread(updated);
                 return updated;
             });
         };
 
+        // Nhan tin nhan moi tu server
         socket.on("SERVER_SEND_MESSAGE", handleIncomingMessage);
 
         return () => {
+            // Huy lang nghe khi unmount
             socket.off("SERVER_SEND_MESSAGE", handleIncomingMessage);
         };
     }, [meId]);

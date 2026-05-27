@@ -6,6 +6,12 @@ type OnlineUsersListProps = {
   onUserPress?: (user: UserAvatar) => void;
 };
 
+/**
+ * Danh sach avatar nguoi dung online theo hang ngang.
+ * @param users Danh sach user
+ * @param onUserPress Callback khi bam vao user
+ * @returns JSX Element
+ */
 export default function OnlineUsersList({ users, onUserPress }: OnlineUsersListProps) {
   return (
     <FlatList

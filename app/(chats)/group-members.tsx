@@ -23,6 +23,10 @@ interface Member {
     role: "owner" | "co_owner" | "member";
 }
 
+/**
+ * Man hinh quan ly thanh vien nhom.
+ * @returns JSX Element
+ */
 export default function GroupMembersScreen() {
     const router = useRouter();
     const { roomId } = useLocalSearchParams<{ roomId: string }>();
@@ -36,6 +40,11 @@ export default function GroupMembersScreen() {
         fetchMembers();
     }, [roomId]);
 
+    /**
+     * Lay danh sach thanh vien nhom.
+     * @returns Promise<void>
+     * @sideEffect Goi API member list.
+     */
     const fetchMembers = async () => {
         setLoading(true);
         try {
@@ -48,6 +57,11 @@ export default function GroupMembersScreen() {
         }
     };
 
+    /**
+     * Kick thanh vien khoi nhom.
+     * @param targetId ID thanh vien
+     * @returns Promise<void>
+     */
     const handleKickMember = async (targetId: string) => {
         if (!user) return;
         if (user._id === targetId) {
@@ -83,11 +97,22 @@ export default function GroupMembersScreen() {
         }, 100); // Đợi menu đóng hẳn
     };
 
+    /**
+     * Mo trang ca nhan cua thanh vien.
+     * @param targetId ID thanh vien
+     * @returns void
+     */
     const handleViewProfile = (targetId: string) => {
         setMenuMemberId(null);
         router.push({ pathname: "/users/[userId]", params: { userId: targetId } });
     };
 
+    /**
+     * Thay doi vai tro thanh vien.
+     * @param targetId ID thanh vien
+     * @param currentRole Vai tro hien tai
+     * @returns Promise<void>
+     */
     const handleChangeRole = async (targetId: string, currentRole: string) => {
         if (!user) return;
         setMenuMemberId(null); // Đóng menu ngay khi chọn
@@ -131,6 +156,11 @@ export default function GroupMembersScreen() {
         }, 100); // Đợi menu đóng hẳn
     };
 
+    /**
+     * Render item thanh vien.
+     * @param item Thanh vien
+     * @returns JSX Element
+     */
     const renderItem = ({ item }: { item: Member }) => {
         const myMember = members.find(m => m.user_id === user?._id);
         const isOwner = myMember?.role === "owner";

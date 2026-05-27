@@ -7,6 +7,14 @@ let handlers = {
   onUnread: null,
 };
 
+/**
+ * Bat dau lang nghe thong bao realtime qua socket.
+ * @param onNew Callback khi co thong bao moi
+ * @param onUpdate Callback khi thong bao duoc cap nhat
+ * @param onUnread Callback khi server gui so thong bao chua doc
+ * @returns void
+ * @sideEffect Dang ky socket events.
+ */
 export const startNotificationListeners = ({ onNew, onUpdate, onUnread }) => {
   if (isListening) {
     stopNotificationListeners();
@@ -45,13 +53,21 @@ export const startNotificationListeners = ({ onNew, onUpdate, onUnread }) => {
     } catch (e) {}
   };
 
+  // Event: thong bao moi
   socket.on("notification:new", handlers.onNew);
+  // Event: thong bao cap nhat
   socket.on("notification:update", handlers.onUpdate);
+  // Event: cap nhat so thong bao chua doc
   socket.on("notification:unread_count", handlers.onUnread);
 
   isListening = true;
 };
 
+/**
+ * Dung lang nghe thong bao realtime.
+ * @returns void
+ * @sideEffect Huy dang ky socket events.
+ */
 export const stopNotificationListeners = () => {
   if (!isListening) return;
   try {
@@ -64,6 +80,12 @@ export const stopNotificationListeners = () => {
   isListening = false;
 };
 
+/**
+ * Join vao room thong bao cua user de nhan event realtime.
+ * @param userId ID nguoi dung
+ * @returns void
+ * @sideEffect Emit socket event JOIN_USER.
+ */
 export const joinUserRoom = (userId) => {
   if (!userId) return;
   try {

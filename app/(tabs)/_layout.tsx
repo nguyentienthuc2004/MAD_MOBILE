@@ -12,6 +12,11 @@ type TabIconProps = {
   focused: boolean;
 };
 
+/**
+ * Icon tab thong bao kem badge chua doc.
+ * @param props Mau/kich thuoc/trang thai focus
+ * @returns JSX Element
+ */
 function NotificationTabIcon({ color, size, focused }: TabIconProps) {
   const unread = useNotifications((s) => s.unreadCount);
 
@@ -29,6 +34,11 @@ function NotificationTabIcon({ color, size, focused }: TabIconProps) {
   );
 }
 
+/**
+ * Icon tab chat kem cham thong bao chua doc.
+ * @param props Mau/kich thuoc/trang thai focus
+ * @returns JSX Element
+ */
 function ChatTabIcon({ color, size, focused }: TabIconProps) {
   const unread = useChatStore((s) => s.unreadCount);
 
@@ -56,6 +66,11 @@ function ChatTabIcon({ color, size, focused }: TabIconProps) {
     </View>
   );
 }
+
+/**
+ * Layout cac tab chinh cua ung dung.
+ * @returns JSX Element
+ */
 const TabsLayout = () => {
   const user = useAuth((state) => state.user);
   return (

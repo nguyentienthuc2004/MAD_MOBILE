@@ -15,6 +15,10 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 const FALLBACK_POST_IMAGE = "https://placehold.co/1080x1080?text=Post";
 
+/**
+ * Man hinh xem mot bai viet kem binh luan.
+ * @returns JSX Element
+ */
 export default function SinglePostView() {
   const params = useLocalSearchParams();
   const postId = String(params.postId ?? "");
@@ -84,6 +88,11 @@ export default function SinglePostView() {
     };
   }, [postId]);
 
+  /**
+   * Toggle like bai viet (optimistic).
+   * @returns Promise<void>
+   * @sideEffect Goi API like post.
+   */
   const togglePostLike = async () => {
     if (!postId) return;
     const prev = postLiked ?? false;
@@ -168,21 +177,40 @@ export default function SinglePostView() {
     if (scrollToCommentId || rootCommentId) setTimeout(() => tryOpen(), 200);
   }, [postId, scrollToCommentId, rootCommentId]);
 
+  /**
+   * Mo khung tra loi binh luan.
+   * @param c Comment
+   * @returns void
+   */
   const handleReplyRequested = (c: Comment) => {
     setReplyTarget(c);
     setEditTarget(null);
   };
 
+  /**
+   * Mo khung chinh sua binh luan.
+   * @param c Comment
+   * @returns void
+   */
   const handleEditRequested = (c: Comment) => {
     setEditTarget(c);
     setReplyTarget(null);
   };
 
+  /**
+   * Huy tra loi/chinh sua.
+   * @returns void
+   */
   const handleCancelReply = () => {
     setReplyTarget(null);
     setEditTarget(null);
   };
 
+  /**
+   * Xu ly khi them binh luan moi.
+   * @param c Comment
+   * @returns void
+   */
   const handleCommentAdded = (c: Comment) => {
     try {
       commentListRef.current?.addComment?.(c);
@@ -207,6 +235,11 @@ export default function SinglePostView() {
     } catch (err) {}
   };
 
+  /**
+   * Xu ly khi chinh sua binh luan.
+   * @param c Comment
+   * @returns void
+   */
   const handleCommentEdited = (c: Comment) => {
     try {
       commentListRef.current?.updateComment?.(c);

@@ -101,6 +101,11 @@ type MemberLeftEvent = {
     userName?: string;
 };
 
+/**
+ * Loai bo tin nhan trung id.
+ * @param items Danh sach tin nhan
+ * @returns Danh sach khong trung
+ */
 const dedupeMessagesById = (items: ChatMessage[]): ChatMessage[] => {
     const uniqueById = new Map<string, ChatMessage>();
 
@@ -111,6 +116,10 @@ const dedupeMessagesById = (items: ChatMessage[]): ChatMessage[] => {
     return Array.from(uniqueById.values());
 };
 
+/**
+ * Man hinh phong chat realtime.
+ * @returns JSX Element
+ */
 export default function ChatRoomScreen() {
     const router = useRouter();
     const { roomId, name, systemNotice } = useLocalSearchParams<{ roomId: string; name?: string; systemNotice?: string }>();
@@ -198,6 +207,12 @@ export default function ChatRoomScreen() {
         return name || "Nhóm chat";
     }, [room, meId, name]);
 
+    /**
+     * Tai danh sach tin nhan cua phong.
+     * @param options Tuy chon silent (khong bat loading)
+     * @returns Promise<void>
+     * @sideEffect Goi API messages, cap nhat cursor.
+     */
     const fetchMessages = useCallback(
         async (options?: { silent?: boolean }) => {
             if (!roomId) return;
@@ -300,6 +315,11 @@ export default function ChatRoomScreen() {
         void fetchMessages();
     }, [fetchMessages]);
 
+    /**
+     * Tai them tin nhan cu hon (phan trang).
+     * @returns Promise<void>
+     * @sideEffect Goi API messages truoc cursor va chen dau danh sach.
+     */
     const loadMoreMessages = useCallback(async () => {
         if (!roomId || loadingMore || !hasMore || !oldestCursor) return;
 
@@ -382,6 +402,11 @@ export default function ChatRoomScreen() {
         }
     }, [roomId, loadingMore, hasMore, oldestCursor, meId]);
 
+    /**
+     * Lay thong tin phong chat.
+     * @returns Promise<void>
+     * @sideEffect Goi API rooms va cap nhat state.
+     */
     const fetchRoom = useCallback(async () => {
         if (!roomId) return;
 
@@ -431,6 +456,10 @@ export default function ChatRoomScreen() {
             });
     }, [roomId]);
 
+    /**
+     * Lam moi danh sach tin nhan va thong tin phong.
+     * @returns Promise<void>
+     */
     const handleRefresh = useCallback(async () => {
         try {
             setRefreshing(true);
@@ -446,6 +475,11 @@ export default function ChatRoomScreen() {
 
         const roomKey = String(roomId);
 
+        /**
+         * Xu ly su kien SERVER_TYPING.
+         * @param payload roomId, userId, name
+         * @returns void
+         */
         const handleTyping = (payload: {
             roomId: string;
             userId: string;
@@ -479,6 +513,11 @@ export default function ChatRoomScreen() {
             }
         };
 
+        /**
+         * Xu ly su kien SERVER_STOP_TYPING.
+         * @param payload roomId, userId
+         * @returns void
+         */
         const handleStopTyping = (payload: { roomId: string; userId: string }) => {
             try {
                 if (!payload) return;
@@ -494,6 +533,11 @@ export default function ChatRoomScreen() {
             }
         };
 
+        /**
+         * Xu ly su kien SERVER_SEND_MESSAGE.
+         * @param m Tin nhan tu server
+         * @returns void
+         */
         const handleIncoming = (m: MessageDto) => {
             console.log("[CHAT] SERVER_SEND_MESSAGE received", {
                 roomId: roomKey,
@@ -545,6 +589,11 @@ export default function ChatRoomScreen() {
         };
 
 
+        /**
+         * Xu ly su kien SERVER_NICKNAME_CHANGED.
+         * @param payload Du lieu doi biet danh
+         * @returns void
+         */
         const handleNicknameChanged = (payload: NicknameChangedEvent) => {
             try {
                 if (!payload || String(payload.roomId) !== roomKey) return;
@@ -608,6 +657,11 @@ export default function ChatRoomScreen() {
             }
         };
 
+        /**
+         * Xu ly su kien SERVER_MESSAGE_DELETED.
+         * @param payload Du lieu xoa tin nhan
+         * @returns void
+         */
         const handleMessageDeleted = (payload: MessageDeletedEvent) => {
             try {
                 if (!payload || String(payload.roomId) !== roomKey) return;
@@ -660,6 +714,11 @@ export default function ChatRoomScreen() {
             }
         };
 
+        /**
+         * Xu ly su kien SERVER_MEMBERS_ADDED.
+         * @param payload Du lieu them thanh vien
+         * @returns void
+         */
         const handleMembersAdded = (payload: MembersAddedEvent) => {
             try {
                 if (!payload || String(payload.roomId) !== roomKey) return;
@@ -732,12 +791,22 @@ export default function ChatRoomScreen() {
             }
         };
 
+        /**
+         * Doi vai tro thanh nhan hien thi.
+         * @param role Vai tro
+         * @returns Chuoi nhan
+         */
         const roleLabel = (role?: string) => {
             if (role === "owner") return "Chủ nhóm";
             if (role === "co_owner") return "Phó nhóm";
             return "Thành viên";
         };
 
+        /**
+         * Xu ly su kien SERVER_MEMBER_REMOVED.
+         * @param payload Du lieu xoa thanh vien
+         * @returns void
+         */
         const handleMemberRemoved = (payload: MemberRemovedEvent) => {
             try {
                 if (!payload || String(payload.roomId) !== roomKey) return;
@@ -793,6 +862,11 @@ export default function ChatRoomScreen() {
             }
         };
 
+        /**
+         * Xu ly su kien SERVER_MEMBER_ROLE_CHANGED.
+         * @param payload Du lieu thay doi vai tro
+         * @returns void
+         */
         const handleMemberRoleChanged = (payload: MemberRoleChangedEvent) => {
             try {
                 if (!payload || String(payload.roomId) !== roomKey) return;
@@ -863,6 +937,11 @@ export default function ChatRoomScreen() {
             }
         };
 
+        /**
+         * Xu ly su kien SERVER_ROOM_TITLE_CHANGED.
+         * @param payload Du lieu doi ten nhom
+         * @returns void
+         */
         const handleRoomTitleChanged = (payload: RoomTitleChangedEvent) => {
             try {
                 if (!payload || String(payload.roomId) !== roomKey) return;
@@ -899,6 +978,11 @@ export default function ChatRoomScreen() {
             }
         };
 
+        /**
+         * Xu ly su kien SERVER_ROOM_AVATAR_CHANGED.
+         * @param payload Du lieu doi avatar nhom
+         * @returns void
+         */
         const handleRoomAvatarChanged = (payload: RoomAvatarChangedEvent) => {
             try {
                 if (!payload || String(payload.roomId) !== roomKey) return;
@@ -935,6 +1019,11 @@ export default function ChatRoomScreen() {
             }
         };
 
+        /**
+         * Xu ly su kien SERVER_MEMBER_LEFT.
+         * @param payload Du lieu roi nhom
+         * @returns void
+         */
         const handleMemberLeft = (payload: MemberLeftEvent) => {
             try {
                 if (!payload || String(payload.roomId) !== roomKey) return;
@@ -1029,6 +1118,11 @@ export default function ChatRoomScreen() {
         };
     }, [roomId, meId]);
 
+    /**
+     * Gui tin nhan van ban (co the kem reply).
+     * @returns Promise<void>
+     * @sideEffect Goi API send message va emit typing stop.
+     */
     const handleSend = async () => {
         const text = input.trim();
         if (!text || !roomId || sending) return;
@@ -1070,6 +1164,11 @@ export default function ChatRoomScreen() {
         }
     };
 
+    /**
+     * Chon va gui anh trong phong chat.
+     * @returns Promise<void>
+     * @sideEffect Mo ImagePicker, goi API sendImage.
+     */
     const handlePickImage = useCallback(async () => {
         if (!roomId || sendingImage) return;
 
@@ -1104,6 +1203,11 @@ export default function ChatRoomScreen() {
         }
     }, [roomId, sendingImage]);
 
+    /**
+     * Render tin nhan trong danh sach.
+     * @param item Tin nhan
+     * @returns JSX Element
+     */
     const renderItem = ({ item }: { item: ChatMessage }) => {
         if (item.kind === "system") {
             return (

@@ -19,6 +19,10 @@ import { type UserAvatar } from "../../components/UserAvatarItem";
 const FALLBACK_POST_IMAGE = "https://placehold.co/1080x1080?text=Post";
 const FALLBACK_AVATAR_URL = "https://placehold.co/200x200?text=User";
 
+/**
+ * Man hinh bang tin.
+ * @returns JSX Element
+ */
 export default function Home() {
   const router = useRouter();
   const user = useAuth((state) => state.user);
@@ -44,6 +48,11 @@ export default function Home() {
   const [followIds, setFollowIds] = useState<Set<string>>(new Set());
   const viewedPostIdsRef = useRef<Set<string>>(new Set());
 
+  /**
+   * Tai du lieu feed va thong tin lien quan.
+   * @returns Promise<void>
+   * @sideEffect Goi API posts/users/following/music, cap nhat state.
+   */
   const fetchFeed = useCallback(async () => {
     if (!isAuthenticated || !user?._id) {
       setApiPosts([]);
@@ -130,6 +139,11 @@ export default function Home() {
     void fetchFeed();
   }, [fetchFeed]);
 
+  /**
+   * Lam moi bang tin va bo de xuat.
+   * @returns Promise<void>
+   * @sideEffect Goi API refresh recommender va reload feed.
+   */
   const handleRefresh = useCallback(async () => {
     try {
       setRefreshing(true);
@@ -174,6 +188,12 @@ export default function Home() {
       }));
   }, [user?._id, users, followIds]);
 
+  /**
+   * Mo phong chat voi tac gia bai viet.
+   * @param post Bai viet
+   * @returns Promise<void>
+   * @sideEffect Tao/lay phong chat va dieu huong.
+   */
   const handleOpenChatFromPost = async (post: Post) => {
     const receiverId = post.authorId;
 
@@ -199,6 +219,11 @@ export default function Home() {
     }
   };
 
+  /**
+   * Dieu huong den man hinh binh luan.
+   * @param post Bai viet
+   * @returns void
+   */
   const handleOpenComments = (post: Post) => {
     void router.push({
       pathname: "/posts/[postId]/comments",
@@ -206,6 +231,11 @@ export default function Home() {
     });
   };
 
+  /**
+   * Mo chi tiet bai viet.
+   * @param post Bai viet
+   * @returns void
+   */
   const handleOpenPostDetail = (post: Post) => {
     void router.push({
       pathname: "/post-detail",
@@ -216,6 +246,11 @@ export default function Home() {
     });
   };
 
+  /**
+   * Mo trang ca nhan cua tac gia.
+   * @param post Bai viet
+   * @returns void
+   */
   const handleOpenUserProfile = (post: Post) => {
     const authorId = post.authorId;
 
@@ -234,6 +269,13 @@ export default function Home() {
     });
   };
 
+  /**
+   * Theo doi/bo theo doi tac gia theo co che optimistic.
+   * @param post Bai viet
+   * @param nextValue Trang thai muon dat
+   * @returns void
+   * @sideEffect Goi API follow/unfollow va cap nhat state.
+   */
   const handleToggleFollow = (post: Post, nextValue: boolean) => {
     if (!isAuthenticated || !user?._id) {
       Alert.alert("Thông báo", "Vui lòng đăng nhập để theo dõi.");
@@ -287,12 +329,22 @@ export default function Home() {
     })();
   };
 
+  /**
+   * Kiem tra dang theo doi tac gia hay khong.
+   * @param post Bai viet
+   * @returns boolean
+   */
   const getIsFollowing = (post: Post) => {
     const authorId = post.authorId;
     if (!authorId) return false;
     return followIds.has(authorId);
   };
 
+  /**
+   * Dieu huong den trang ca nhan tu avatar online.
+   * @param selectedUser Nguoi dung
+   * @returns void
+   */
   const handleOpenUserByAvatar = (selectedUser: UserAvatar) => {
     if (!selectedUser.id) {
       return;
@@ -309,6 +361,12 @@ export default function Home() {
     });
   };
 
+  /**
+   * Danh dau post da duoc xem khi xuat hien tren man hinh.
+   * @param post Bai viet
+   * @returns Promise<void>
+   * @sideEffect Goi API viewPost, ghi vao tap da xem.
+   */
   const handlePostVisible = useCallback(
     async (post: Post) => {
       if (!user?._id || !post.id || viewedPostIdsRef.current.has(post.id)) {

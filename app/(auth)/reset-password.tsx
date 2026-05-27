@@ -12,6 +12,10 @@ import {
 } from "react-native";
 import { authService } from "../../services/auth.service";
 
+/**
+ * Man hinh dat lai mat khau.
+ * @returns JSX Element
+ */
 export default function ResetPasswordScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
@@ -21,6 +25,12 @@ export default function ResetPasswordScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  /**
+   * Goi API dat lai mat khau.
+   * @param logoutOtherDevices Dang xuat cac thiet bi khac
+   * @returns Promise<void>
+   * @sideEffect Goi API reset password va dieu huong.
+   */
   const submitResetPassword = async (logoutOtherDevices: boolean) => {
     setLoading(true);
     setError(null);
@@ -38,6 +48,10 @@ export default function ResetPasswordScreen() {
     }
   };
 
+  /**
+   * Kiem tra input va hoi dang xuat thiet bi khac.
+   * @returns Promise<void>
+   */
   const handleReset = async () => {
     if (newPassword.length < 6) {
       setError("Mật khẩu phải có ít nhất 6 ký tự");

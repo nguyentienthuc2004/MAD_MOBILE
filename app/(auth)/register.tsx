@@ -12,6 +12,10 @@ import {
     View,
 } from "react-native";
 
+/**
+ * Man hinh dang ky tai khoan.
+ * @returns JSX Element
+ */
 export default function RegisterScreen() {
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
@@ -24,8 +28,18 @@ export default function RegisterScreen() {
   const error = useAuth((state) => state.error);
   const clearError = useAuth((state) => state.clearError);
 
+  /**
+   * Kiem tra dinh dang email.
+   * @param value Email
+   * @returns boolean
+   */
   const isValidEmail = (value: string) => /\S+@\S+\.\S+/.test(value);
 
+  /**
+   * Xu ly dang ky.
+   * @returns Promise<void>
+   * @sideEffect Goi auth store register.
+   */
   const handleRegister = async () => {
     if (
       !username.trim() ||

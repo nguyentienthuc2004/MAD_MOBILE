@@ -1,6 +1,10 @@
 import { Link, Stack } from "expo-router";
 import { StyleSheet, Text, View } from "react-native";
 
+/**
+ * Man hinh khi route khong ton tai.
+ * @returns JSX Element
+ */
 export default function NotFoundScreen() {
 	return (
 		<>

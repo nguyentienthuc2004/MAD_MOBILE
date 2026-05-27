@@ -17,6 +17,10 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { chatService, type RoomUser } from "@/services/chat.service";
 import { userService } from "@/services/user.service";
 
+/**
+ * Man hinh cap nhat biet danh thanh vien.
+ * @returns JSX Element
+ */
 export default function NicknamesScreen() {
     const router = useRouter();
     const { roomId, name } =
@@ -32,6 +36,11 @@ export default function NicknamesScreen() {
 
     const roomIdStr = typeof roomId === "string" ? roomId : String(roomId ?? "");
 
+    /**
+     * Tai danh sach thanh vien va username that.
+     * @returns Promise<void>
+     * @sideEffect Goi API rooms va users.
+     */
     const fetchMembers = useCallback(async () => {
         if (!roomIdStr) return;
         try {
@@ -75,6 +84,12 @@ export default function NicknamesScreen() {
         }
     }, [roomIdStr]);
 
+    /**
+     * Luu biet danh cho thanh vien.
+     * @param userId ID thanh vien
+     * @returns Promise<void>
+     * @sideEffect Goi API update nickname.
+     */
     const handleSaveNickname = useCallback(
         async (userId: string) => {
             if (!roomIdStr) return;
@@ -114,6 +129,11 @@ export default function NicknamesScreen() {
             ? members.find((m) => m.user_id === editingUserId)
             : null;
 
+    /**
+     * Chon thanh vien de chinh sua biet danh.
+     * @param user Thanh vien
+     * @returns void
+     */
     const handleSelectMember = (user: RoomUser) => {
         setEditingUserId(user.user_id);
         const currentNickname = nicknameEdits[user.user_id] ?? user.nickname ?? "";

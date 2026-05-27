@@ -13,6 +13,13 @@ type UserAvatarItemProps = {
   onPress?: (user: UserAvatar) => void;
 };
 
+/**
+ * Item avatar nguoi dung kem trang thai online.
+ * @param user Thong tin user
+ * @param showOnlineDot Co hien cham online khong
+ * @param onPress Callback khi bam vao item
+ * @returns JSX Element
+ */
 export default function UserAvatarItem({
   user,
   showOnlineDot = true,

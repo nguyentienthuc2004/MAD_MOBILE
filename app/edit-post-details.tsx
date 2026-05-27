@@ -20,6 +20,11 @@ import { SafeAreaView } from "react-native-safe-area-context";
 const MAX_CAPTION = 500;
 const MAX_IMAGES = 10;
 
+/**
+ * Parse danh sach uri da chon tu params.
+ * @param value Gia tri params
+ * @returns Danh sach uri
+ */
 const parseSelectedUris = (value: string | string[] | undefined): string[] => {
   const rawValue = Array.isArray(value) ? value[0] : value;
 
@@ -42,6 +47,11 @@ const parseSelectedUris = (value: string | string[] | undefined): string[] => {
   }
 };
 
+/**
+ * Chuan hoa hashtag tu input.
+ * @param value Chuoi hashtag
+ * @returns Danh sach hashtag
+ */
 const parseHashtagsInput = (value: string) => {
   const normalized = value
     .split(/[,#]/g)
@@ -51,6 +61,11 @@ const parseHashtagsInput = (value: string) => {
   return Array.from(new Set(normalized));
 };
 
+/**
+ * Parse hashtags ban dau tu params.
+ * @param value Chuoi hoac JSON
+ * @returns Chuoi hashtag
+ */
 const parseInitialHashtags = (value: string | undefined) => {
   if (!value) {
     return "";
@@ -72,6 +87,10 @@ const parseInitialHashtags = (value: string | undefined) => {
   return parseHashtagsInput(value).join(", ");
 };
 
+/**
+ * Man hinh chinh sua caption/hashtag bai viet.
+ * @returns JSX Element
+ */
 export default function EditPostDetailsScreen() {
   const router = useRouter();
   const { request, loading, error } = useApi<ApiResponse<Post>>();
@@ -165,6 +184,12 @@ export default function EditPostDetailsScreen() {
     [loading, postId, selectedImageUris.length],
   );
 
+  /**
+   * Xoa anh khoi danh sach da chon.
+   * @param uri Duong dan anh
+   * @param index Vi tri anh
+   * @returns void
+   */
   const handleDeleteImage = (uri: string, index: number) => {
     Alert.alert("Xóa ảnh", "Bạn có chắc muốn xóa ảnh này không?", [
       {
@@ -185,6 +210,11 @@ export default function EditPostDetailsScreen() {
     ]);
   };
 
+  /**
+   * Luu thay doi bai viet.
+   * @returns void
+   * @sideEffect Goi API edit post va dieu huong.
+   */
   const handlePublish = async () => {
     if (!postId) {
       return;

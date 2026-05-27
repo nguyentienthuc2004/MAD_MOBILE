@@ -19,6 +19,11 @@ import { SafeAreaView } from "react-native-safe-area-context";
 const MAX_CAPTION = 500;
 const MAX_IMAGES = 10;
 
+/**
+ * Parse danh sach uri da chon tu params.
+ * @param value Gia tri params
+ * @returns Danh sach uri
+ */
 const parseSelectedUris = (value: string | string[] | undefined): string[] => {
   const rawValue = Array.isArray(value) ? value[0] : value;
 
@@ -41,6 +46,11 @@ const parseSelectedUris = (value: string | string[] | undefined): string[] => {
   }
 };
 
+/**
+ * Chuan hoa hashtag tu input nguoi dung.
+ * @param value Chuoi hashtag
+ * @returns Danh sach hashtag
+ */
 const parseHashtagsInput = (value: string) => {
   const normalized = value
     .split(/[,#]/g)
@@ -50,6 +60,10 @@ const parseHashtagsInput = (value: string) => {
   return Array.from(new Set(normalized));
 };
 
+/**
+ * Man hinh nhap caption/hashtag cho bai viet moi.
+ * @returns JSX Element
+ */
 export default function CreatePostDetailsScreen() {
   const router = useRouter();
   const { request, loading, error } = useApi<ApiResponse<Post>>();
@@ -100,6 +114,11 @@ export default function CreatePostDetailsScreen() {
     [loading, selectedImageUris.length]
   );
 
+  /**
+   * Dang bai viet moi.
+   * @returns void
+   * @sideEffect Goi API create post va dieu huong ve profile.
+   */
   const handlePublish = async () => {
     console.log("Create post payload:", postPayload);
 

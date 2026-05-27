@@ -33,6 +33,11 @@ type SearchParams = {
   selectedUris?: string | string[];
 };
 
+/**
+ * Parse danh sach uri tu params.
+ * @param value Gia tri params
+ * @returns Danh sach uri
+ */
 const parseSelectedUris = (value: string | string[] | undefined): string[] => {
   const rawValue = Array.isArray(value) ? value[0] : value;
 
@@ -55,11 +60,26 @@ const parseSelectedUris = (value: string | string[] | undefined): string[] => {
   }
 };
 
+/**
+ * Chuan hoa text de so khop.
+ * @param text Chuoi
+ * @returns Chuoi da chuan hoa
+ */
 const normalize = (text: string) => text.trim().toLowerCase();
 
+/**
+ * Loai bo dau ngoac kep bao quanh.
+ * @param value Chuoi
+ * @returns Chuoi da lam sach
+ */
 const removeWrappingQuotes = (value: string) =>
   value.replace(/^['\"]+|['\"]+$/g, "");
 
+/**
+ * Encode URL an toan.
+ * @param value URL
+ * @returns URL da encode
+ */
 const toEncodedUrl = (value: string) => {
   try {
     return encodeURI(value);
@@ -68,6 +88,11 @@ const toEncodedUrl = (value: string) => {
   }
 };
 
+/**
+ * Loai bo chuoi trung lap.
+ * @param values Danh sach chuoi
+ * @returns Danh sach da loc
+ */
 const dedupeStrings = (values: string[]) => {
   const output: string[] = [];
 
@@ -82,6 +107,11 @@ const dedupeStrings = (values: string[]) => {
   return output;
 };
 
+/**
+ * Tao danh sach URL nhac co the phat.
+ * @param rawUrl URL goc
+ * @returns Danh sach URL
+ */
 const buildMediaUrlCandidates = (rawUrl?: string): string[] => {
   if (!rawUrl) {
     return [];
@@ -140,11 +170,20 @@ const buildMediaUrlCandidates = (rawUrl?: string): string[] => {
   return dedupeStrings([fromApiOrigin, toEncodedUrl(fromApiOrigin)]);
 };
 
+/**
+ * Lay URL nhac phu hop nhat.
+ * @param rawUrl URL goc
+ * @returns URL ket qua
+ */
 const resolveMediaUrl = (rawUrl?: string): string => {
   const candidates = buildMediaUrlCandidates(rawUrl);
   return candidates[0] ?? "";
 };
 
+/**
+ * Man hinh chon nhac khi chinh sua bai viet.
+ * @returns JSX Element
+ */
 export default function EditPostMusicScreen() {
   const { width: screenWidth } = useWindowDimensions();
   const carouselWidth = Math.max(screenWidth - 24, 1);
@@ -204,6 +243,10 @@ export default function EditPostMusicScreen() {
 
   const canContinue = selectedImageUris.length > 0 && Boolean(selectedTrack);
 
+  /**
+   * Dung preview nhac.
+   * @returns Promise<void>
+   */
   const stopPreview = useCallback(async () => {
     if (!soundRef.current) {
       setPlayingMusicId(null);
@@ -221,6 +264,11 @@ export default function EditPostMusicScreen() {
     }
   }, []);
 
+  /**
+   * Phat preview nhac.
+   * @param track Bai nhac
+   * @returns Promise<void>
+   */
   const playPreview = useCallback(
     async (track: Music) => {
       const previewUrlCandidates = buildMediaUrlCandidates(track.url);
@@ -323,6 +371,11 @@ export default function EditPostMusicScreen() {
     []
   );
 
+  /**
+   * Chon nhac va bat/tat preview.
+   * @param track Bai nhac
+   * @returns void
+   */
   const handleSelectMusic = useCallback(
     (track: Music) => {
       if (selectedMusicId === track._id && playingMusicId === track._id) {
@@ -336,6 +389,11 @@ export default function EditPostMusicScreen() {
     [playPreview, playingMusicId, selectedMusicId, stopPreview]
   );
 
+  /**
+   * Cap nhat chi so anh khi vuot carousel.
+   * @param event Su kien scroll
+   * @returns void
+   */
   const handleImageSwipeEnd = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
       if (selectedImageUris.length <= 1) {
@@ -351,6 +409,11 @@ export default function EditPostMusicScreen() {
     [carouselWidth, selectedImageUris.length]
   );
 
+  /**
+   * Tai danh sach nhac.
+   * @returns Promise<void>
+   * @sideEffect Goi API music list.
+   */
   const fetchMusics = useCallback(async () => {
     const res = await request(() => musicService.getAllMusics());
 
@@ -361,6 +424,10 @@ export default function EditPostMusicScreen() {
     setMusics(res.data.filter((music) => !music.isDeleted));
   }, [request]);
 
+  /**
+   * Chuyen sang buoc chinh sua noi dung bai viet.
+   * @returns void
+   */
   const handleNext = useCallback(() => {
     if (!selectedTrack) {
       return;
@@ -396,6 +463,10 @@ export default function EditPostMusicScreen() {
     void fetchMusics();
   }, [fetchMusics]);
 
+  /**
+   * Lam moi danh sach nhac.
+   * @returns Promise<void>
+   */
   const handleRefresh = useCallback(async () => {
     try {
       setRefreshing(true);

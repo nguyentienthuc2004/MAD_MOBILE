@@ -20,6 +20,10 @@ const FALLBACK_AVATAR = "https://placehold.co/100x100/e2e8f0/64748b?text=U";
 
 type TabType = "followers" | "following";
 
+/**
+ * Man hinh danh sach followers/following.
+ * @returns JSX Element
+ */
 export default function FollowersScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{
@@ -52,6 +56,11 @@ export default function FollowersScreen() {
   // Track which users the current user is following (for the followers tab)
   const [myFollowingSet, setMyFollowingSet] = useState<Set<string>>(new Set());
 
+  /**
+   * Lay danh sach followers.
+   * @returns Promise<void>
+   * @sideEffect Goi API followers.
+   */
   const fetchFollowers = useCallback(async () => {
     if (!targetUserId) return;
     setLoadingFollowers(true);
@@ -65,6 +74,11 @@ export default function FollowersScreen() {
     }
   }, [targetUserId]);
 
+  /**
+   * Lay danh sach following.
+   * @returns Promise<void>
+   * @sideEffect Goi API following.
+   */
   const fetchFollowing = useCallback(async () => {
     if (!targetUserId) return;
     setLoadingFollowing(true);
@@ -79,6 +93,10 @@ export default function FollowersScreen() {
   }, [targetUserId]);
 
   // Fetch who the current user is following to show correct button states
+  /**
+   * Lay danh sach minh dang follow (de hien nut).
+   * @returns Promise<void>
+   */
   const fetchMyFollowing = useCallback(async () => {
     if (!me?._id) return;
     try {
@@ -96,6 +114,13 @@ export default function FollowersScreen() {
     void fetchMyFollowing();
   }, [fetchFollowers, fetchFollowing, fetchMyFollowing]);
 
+  /**
+   * Theo doi/bo theo doi nguoi dung.
+   * @param userId ID nguoi dung
+   * @param currentlyFollowing Trang thai hien tai
+   * @returns Promise<void>
+   * @sideEffect Goi API follow/unfollow va refresh list.
+   */
   const handleToggleFollow = useCallback(
     async (userId: string, currentlyFollowing: boolean) => {
       if (followLoadingIds.has(userId)) return;
@@ -136,6 +161,11 @@ export default function FollowersScreen() {
     [followLoadingIds, fetchFollowers, fetchFollowing]
   );
 
+  /**
+   * Mo phong chat voi nguoi dung.
+   * @param userId ID nguoi dung
+   * @returns Promise<void>
+   */
   const handleMessage = useCallback(
     async (userId: string) => {
       try {
@@ -154,6 +184,11 @@ export default function FollowersScreen() {
     [router]
   );
 
+  /**
+   * Mo trang ca nhan nguoi dung.
+   * @param userId ID nguoi dung
+   * @returns void
+   */
   const handleUserPress = (userId: string) => {
     if (userId === me?._id) {
       router.push("/(tabs)/profile");
@@ -164,6 +199,11 @@ export default function FollowersScreen() {
 
   const isViewingOwnProfile = targetUserId === me?._id;
 
+  /**
+   * Render item follower.
+   * @param item Follower
+   * @returns JSX Element
+   */
   const renderFollowerItem = ({ item }: { item: FollowUser }) => {
     const isSelf = item._id === me?._id;
     const isFollowing = myFollowingSet.has(item._id);
@@ -219,6 +259,11 @@ export default function FollowersScreen() {
     );
   };
 
+  /**
+   * Render item following.
+   * @param item Following
+   * @returns JSX Element
+   */
   const renderFollowingItem = ({ item }: { item: FollowUser }) => {
     const isSelf = item._id === me?._id;
     const isToggling = followLoadingIds.has(item._id);

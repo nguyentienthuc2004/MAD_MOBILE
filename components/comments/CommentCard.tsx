@@ -26,6 +26,11 @@ type Props = {
   isHighlighted?: boolean;
 };
 
+/**
+ * Dinh dang thoi gian tu thoi diem tao binh luan.
+ * @param datestr Chuoi thoi gian
+ * @returns Chuoi thoi gian tuong doi
+ */
 function timeAgo(datestr?: string) {
   if (!datestr) return "";
   const t = Date.now() - new Date(datestr).getTime();
@@ -39,6 +44,19 @@ function timeAgo(datestr?: string) {
   return `${d}d`;
 }
 
+/**
+ * The hien mot binh luan (root hoac reply).
+ * @param comment Du lieu binh luan
+ * @param variant Kieu hien thi
+ * @param onPressReply Callback tra loi
+ * @param onLongPress Callback nhan giu
+ * @param onPress Callback bam vao binh luan
+ * @param onPressReplies Callback mo/thu reply
+ * @param isExpanded Trang thai mo reply
+ * @param loadingReplies Dang tai reply
+ * @param isHighlighted Co highlight khong
+ * @returns JSX Element
+ */
 export default function CommentCard({
   comment,
   variant,
@@ -92,6 +110,11 @@ export default function CommentCard({
     }).start();
   }, [variant, mountAnim]);
 
+  /**
+   * Toggle like cho binh luan.
+   * @returns void
+   * @sideEffect Goi API like va cap nhat state.
+   */
   async function handleLike() {
     const id = (comment as any).id ?? (comment as any)._id;
     try {

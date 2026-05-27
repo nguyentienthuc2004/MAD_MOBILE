@@ -9,6 +9,14 @@ type Props = {
   onCancel: () => void;
 };
 
+/**
+ * Toast xac nhan thao tac (vi du xoa binh luan).
+ * @param visible Trang thai hien thi
+ * @param message Noi dung thong bao
+ * @param onConfirm Xac nhan
+ * @param onCancel Huy
+ * @returns JSX Element
+ */
 const ConfirmToast: React.FC<Props> = ({
   visible,
   message,

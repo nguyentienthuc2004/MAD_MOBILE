@@ -34,6 +34,11 @@ export type Post = {
   isSensitive?: boolean;
 };
 
+/**
+ * Kiem tra loi gian doan phat am thanh co the bo qua.
+ * @param error Loi
+ * @returns true neu la loi gian doan
+ */
 const isPlaybackInterruptionError = (error: unknown) => {
   if (!(error instanceof Error)) {
     return false;
@@ -45,6 +50,11 @@ const isPlaybackInterruptionError = (error: unknown) => {
   );
 };
 
+/**
+ * Dinh dang thoi gian tao bai viet.
+ * @param createdAt Chuoi thoi gian
+ * @returns Chuoi da format
+ */
 const formatPostTime = (createdAt?: string) => {
   if (!createdAt) {
     return "";
@@ -87,6 +97,11 @@ const formatPostTime = (createdAt?: string) => {
   });
 };
 
+/**
+ * Chuan hoa hashtag cho phan caption.
+ * @param hashtags Danh sach hoac chuoi hashtag
+ * @returns Chuoi hashtag da format
+ */
 const formatHashtagText = (hashtags?: string[] | string) => {
   let rawHashtags: string[] = [];
 
@@ -155,6 +170,29 @@ type PostCardProps = {
   menuActions?: PostCardMenuAction[];
 };
 
+/**
+ * Card hien thi bai viet trong feed.
+ * @param post Du lieu bai viet
+ * @param sensitiveResetKey Khoa reset che do nhay cam
+ * @param liked Trang thai like tu ben ngoai
+ * @param likeCount So luong like tu ben ngoai
+ * @param isActive Post dang focus
+ * @param isFeedMuted Trang thai tat am
+ * @param canFollow Cho phep follow
+ * @param isFollowing Trang thai follow
+ * @param isOwnPost Co phai bai viet cua minh
+ * @param onToggleLike Callback toggle like
+ * @param onToggleFeedMuted Callback tat/bat am
+ * @param onToggleFollow Callback follow
+ * @param onPressUser Callback mo user
+ * @param onPressPost Callback mo post
+ * @param onPressMessage Callback nhan tin
+ * @param onPressComment Callback mo binh luan
+ * @param onPressEditPost Callback sua post
+ * @param onPressDeletePost Callback xoa post
+ * @param menuActions Danh sach action tuy chon
+ * @returns JSX Element
+ */
 export default function PostCard({
   post,
   sensitiveResetKey = 0,
@@ -244,11 +282,21 @@ export default function PostCard({
         ]
       : []);
 
+  /**
+   * Xu ly chon action trong menu.
+   * @param action Hanh dong duoc chon
+   * @returns void
+   */
   const handlePressMenuAction = (action: PostCardMenuAction) => {
     setShowMoreMenu(false);
     action.onPress?.();
   };
 
+  /**
+   * Toggle theo doi tac gia bai viet.
+   * @returns void
+   * @sideEffect Cap nhat state follow va goi callback.
+   */
   const handleToggleFollow = () => {
     if (!canFollow) {
       return;
@@ -263,6 +311,11 @@ export default function PostCard({
     onToggleFollow?.(nextFollowing);
   };
 
+  /**
+   * Cap nhat index anh khi scroll ket thuc.
+   * @param event Su kien scroll
+   * @returns void
+   */
   const handleImageScrollEnd = (
     event: NativeSyntheticEvent<NativeScrollEvent>,
   ) => {
@@ -273,20 +326,36 @@ export default function PostCard({
     setCurrentImageIndex(safeIndex);
   };
 
+  /**
+   * Danh dau bat dau cham vao danh sach anh.
+   * @returns void
+   */
   const handleImageListTouchStart = () => {
     imageListDidDragRef.current = false;
   };
 
+  /**
+   * Danh dau dang keo danh sach anh.
+   * @returns void
+   */
   const handleImageListScrollBeginDrag = () => {
     imageListDidDragRef.current = true;
   };
 
+  /**
+   * Reset trang thai keo sau khi dung.
+   * @returns void
+   */
   const handleImageListScrollEndDrag = () => {
     setTimeout(() => {
       imageListDidDragRef.current = false;
     }, 80);
   };
 
+  /**
+   * Mo bai viet khi cham anh (neu khong phai keo).
+   * @returns void
+   */
   const handleImageListTouchEnd = () => {
     if (!onPressPost || isSensitiveBlocked) {
       return;
@@ -407,6 +476,10 @@ export default function PostCard({
     };
   }, [isActive, isFeedMuted, isScreenFocused, post.musicUrl]);
 
+  /**
+   * Bat/tat am nhac cho bai viet.
+   * @returns void
+   */
   const handleOpenMusic = async () => {
     if (!post.musicUrl) {
       return;
@@ -415,6 +488,11 @@ export default function PostCard({
     onToggleFeedMuted?.();
   };
 
+  /**
+   * Toggle like bai viet (co optimistic update).
+   * @returns void
+   * @sideEffect Goi API like va cap nhat UI.
+   */
   const handleLikePost = async () => {
     const id = postId;
     if (!id || isLiking) return;
@@ -451,6 +529,10 @@ export default function PostCard({
     }
   };
 
+  /**
+   * Hien canh bao noi dung nhay cam va cho phep xem.
+   * @returns void
+   */
   const handleRevealSensitivePost = () => {
     if (!isSensitiveBlocked) {
       return;

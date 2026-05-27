@@ -7,6 +7,10 @@ import React, { useRef, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+/**
+ * Man hinh binh luan cho bai viet.
+ * @returns JSX Element
+ */
 export default function CommentsRoute() {
   const params = useLocalSearchParams();
   const postId = String(params.postId ?? "");
@@ -15,6 +19,11 @@ export default function CommentsRoute() {
   const [editTarget, setEditTarget] = useState<Comment | null>(null);
   const listRef = useRef<any>(null);
 
+  /**
+   * Mo thread tra loi tu binh luan.
+   * @param comment Comment
+   * @returns Promise<void>
+   */
   const handleReplyRequested = async (comment: Comment) => {
     const commentId = (comment as any).id ?? (comment as any)._id;
     const rootId = (comment as any).rootCommentId ?? commentId;
@@ -26,8 +35,18 @@ export default function CommentsRoute() {
 
     setReplyTarget(comment);
   };
+  /**
+   * Bat dau chinh sua binh luan.
+   * @param comment Comment
+   * @returns void
+   */
   const handleEditRequested = (comment: Comment) => setEditTarget(comment);
 
+  /**
+   * Xu ly khi them binh luan moi.
+   * @param c Comment
+   * @returns void
+   */
   const handleCommentAdded = (c: Comment) => {
     // insert into list optimistically
     listRef.current?.addComment(c);
@@ -35,6 +54,11 @@ export default function CommentsRoute() {
     setEditTarget(null);
   };
 
+  /**
+   * Xu ly khi chinh sua binh luan.
+   * @param c Comment
+   * @returns void
+   */
   const handleCommentEdited = (c: Comment) => {
     listRef.current?.updateComment(c);
     setEditTarget(null);
